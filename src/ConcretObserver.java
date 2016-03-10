@@ -4,7 +4,6 @@ import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 public class ConcretObserver implements Observer{
@@ -75,7 +74,7 @@ public class ConcretObserver implements Observer{
 			case 1: System.out.println("Remove all");
 					System.out.println("Tamanho dos novos pontos: " + newPoints.size());	
 					System.out.println("Tamanho dos pontos atuais: " + points.size());
-					removeAll(newPoints);
+					points.removeAll(newPoints);
 					System.out.println("Tamanho depois de atualizado: " + points.size());
 					break;
 		}
@@ -86,15 +85,6 @@ public class ConcretObserver implements Observer{
 			frame.setPoints(points);
 			frame.revalidate();
 			frame.repaint();
-		}
-	}
-	
-	public static void removeAll(List<Point> newPoints){
-		for(Point p1 : points){
-			for(Point p2 : newPoints){
-				if(p1.getX() == p1.getX() && p2.getX() == p2.getY())
-					points.remove(p2);
-			}
 		}
 	}
 

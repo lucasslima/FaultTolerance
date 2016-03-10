@@ -38,22 +38,12 @@ public class Point implements Serializable, Comparable<Point>{
 	public int compareTo(Point o) {
 
 		Point p = (Point)o;
-		if (this.x < p.getX())
-	    {
-	    	return -1;
-	    }
-		else if (this.x > p.getX())
-	    {
-	    	return 1;
-	    }
-		else //if (this.x == p.getX())
-	    {
-	    	if (this.y == p.getY()) return 0;
-	    	if (this.y < p.getY()) return -1;
-	    	else return 1; 
-	    }
-	    
+	    if(this.x == p.getX() && y == p.getY())
+	    	return 0; 
+	    else
+	    	return -1;	    		
 	 }
 
+	
+	
 }
-// bla bla
