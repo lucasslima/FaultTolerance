@@ -5,6 +5,15 @@ public class SubjectMessage implements Serializable{
 	private static final long serialVersionUID = 1L;
 	private List<Point> points;
 	private int 		type;
+	private String 		ip;
+
+	public String getIp() {
+		return ip;
+	}
+
+	public void setIp(String ip) {
+		this.ip = ip;
+	}
 
 	public int getType() {
 		return type;

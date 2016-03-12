@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Random;
 
 
-public class Subject implements Observable {
+public class Clone implements Observable {
 	private static List<Point> 	points;
 	private static List<Point> 	newPoints;
 	private static List<String> observers;
@@ -22,24 +22,23 @@ public class Subject implements Observable {
 	private static final int 	minimum = 150;
 	private static final int 	maximum = 350;
 	private static int 			change;
-	private static Subject		myInstance;
-	private static Thread		threadToListenMaster;
-	private static Thread 		threadToNotifyObservers;
-	private static Thread 		threadToListenClone;
+	private static Clone		clone;
 	private static Thread 		threadToCheckMaster;
+	private static Thread 		threadMaster;
+	private static Thread 		threadClone;
 	private static String 		masterIp;
 	private static String 		cloneIp;
 	private static boolean 		amIMaster; 
 	private static long 		timeLastMessage; 
 	private static boolean		firstCommunication;
 	
-	public Subject() throws IOException{
-		serverSocket 		= new ServerSocket(portMaster);
+	public Clone() throws IOException{
+		serverSocket 		= new ServerSocket(portClone);
 		observers 			= new ArrayList<String>();
 		points 				= new ArrayList<Point>();
 		newPoints 			= new ArrayList<Point>();
 		random 				= new Random();
-		amIMaster			= true; 
+		amIMaster			= false; 
 		masterIp			= "localhost";
 		cloneIp				= "localhost";
 		firstCommunication  = true; 
@@ -55,13 +54,26 @@ public class Subject implements Observable {
 				point.setCor(cor);
 				points.add(point);
 			}
-			startMaster();
-		} else 
-			startClone();
+			threadMaster = new Thread(){
+				@Override
+				public void run(){
+					startMaster();
+				}
+			};
+			threadMaster.start();
+		} else {
+			threadClone = new Thread(){
+				@Override
+				public void run(){
+					startClone();
+				}
+			};
+			threadClone.start();
+		}
 	}
 
 	public static void main(String[] args) throws IOException {
-		myInstance = new Subject();
+		clone = new Clone();
 	}
 
 	/**
@@ -71,12 +83,7 @@ public class Subject implements Observable {
 	 * E outra thread para verificar se o master está ativo
 	 */
 	public static void startClone(){
-		if(threadToListenMaster != null)
-			threadToListenMaster.interrupt();
-		else if(threadToNotifyObservers != null)
-			threadToNotifyObservers.interrupt();
-		
-		threadToListenClone = new Thread(){
+		new Thread(){
 			@Override
 			public void run(){
 				try {
@@ -85,14 +92,18 @@ public class Subject implements Observable {
 					e.printStackTrace();
 				}
 			}
-		};
-		threadToListenClone.start();
+		}.start();
 		
 		threadToCheckMaster = new Thread(){
 			@Override
 			public void run(){
-				while((System.currentTimeMillis() - timeLastMessage)/1000000000 > 700);
+				while((System.currentTimeMillis() - timeLastMessage) < 700);
 				System.out.println("I am the master now");
+				try {
+					setNewMaster();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
 			}
 		};
 	}
@@ -103,13 +114,9 @@ public class Subject implements Observable {
 	 * Ela cria uma nova thread para esperar por novas conexões 
 	 * E cria uma outra thread para mudar o conjunto de pontos aleatóriamente
 	 */
-	public void startMaster(){
-		//Se eu virei o master eu interrompo a thread do clone
-		if(threadToListenClone != null)
-			threadToListenClone.interrupt();
-		
+	private static void startMaster(){
 		//inicia o servidor para ficar ouvindo os clientes em uma thread 
-		threadToListenMaster = new Thread() {
+		new Thread() {
 			@Override
 			public void run() {
 				try {
@@ -118,27 +125,26 @@ public class Subject implements Observable {
 					e.printStackTrace();
 				}
 			}
-		};
-		threadToListenMaster.start();
+		}.start();
 		
 		//inicia uma nova thread para aleatoriamente adicionar ou remover pontos e enviar os novos pontos para os observers
-		threadToNotifyObservers = new Thread() {
+		new Thread() {
 			@Override
 			public void run() {
 				try {
 					while(true){
-						int seg = random.nextInt(600);
+						int seg = random.nextInt(350);
 						Thread.sleep(seg);
 						changePoints();
-						sendMessageToClone(CloneMessage.SAVE,null);
+//						sendMessageToClone(CloneMessage.SAVE,null);
+						clone.notifyObservers(0);
 					}
 
 				} catch (InterruptedException e) {					
 					e.printStackTrace();
 				}
 			}
-		};
-		threadToNotifyObservers.start();
+		}.start();
 	}
 	
 	/**
@@ -185,7 +191,7 @@ public class Subject implements Observable {
 	 * @throws IOException
 	 */
 	public static void listenFromMaster() throws IOException{
-		while(true){ 
+		while(!amIMaster){ 
 			Socket s = serverSocket.accept();
 			new Thread() {
 				@Override
@@ -194,9 +200,7 @@ public class Subject implements Observable {
 						ObjectInputStream in = new ObjectInputStream(s.getInputStream());
 						Object object = in.readObject();
 						
-						if(object instanceof CloneMessage){
-							getMessageFromMaster(object);
-						}
+						getMessageFromMaster(object);
 						
 						
 					} catch (IOException e) {
@@ -241,6 +245,29 @@ public class Subject implements Observable {
 	}
 	
 	/**
+	 * Essa função é chamada quando o master é desligado
+	 * O clone agora assumirá o controle
+	 * @throws InterruptedException 
+	 */
+	@SuppressWarnings("deprecation")
+	private static void setNewMaster() throws InterruptedException{
+		System.out.println("Set new master");
+		threadClone.interrupt();
+		amIMaster = true;
+		cloneIp = null;
+		threadMaster = new Thread(){
+			@Override
+			public void run(){
+				startMaster();
+			}
+		};
+		threadMaster.start();
+		clone.notifyObservers(1);
+		
+		
+	}
+	
+	/**
 	 * USADA SOMENTE PELO CLONE
 	 * Essa função recebe uma mensagem do master
 	 * Essa mensagem pode ser para adicionar um novo observer
@@ -255,7 +282,11 @@ public class Subject implements Observable {
 		switch(message.getType()){
 			case CloneMessage.ADD: 	observers.add(message.getObserver());
 									break;
-			case CloneMessage.SAVE: timeLastMessage = System.currentTimeMillis();
+			case CloneMessage.SAVE:	timeLastMessage = System.currentTimeMillis();
+									if(firstCommunication){
+										firstCommunication = false; 
+										threadToCheckMaster.start();
+									}
 									points.clear();
 									points = message.getPoints();
 									sendMessageToMaster();
@@ -275,9 +306,9 @@ public class Subject implements Observable {
 	private static void getMessageFromObserver(Object object) throws UnknownHostException, IOException{
 		ObserverMessage message = (ObserverMessage) object;
 		switch (message.getType()) {
-			case 0:	myInstance.registerObserver(message.getIp());
+			case 0:	clone.registerObserver(message.getIp());
 					break;
-			case 1:	myInstance.unregisterObserver(message.getIp());
+			case 1:	clone.unregisterObserver(message.getIp());
 					break;
 		}		
 	}
@@ -293,7 +324,7 @@ public class Subject implements Observable {
 		CloneMessage message = (CloneMessage) object;
 		
 		switch(message.getType()){
-			case CloneMessage.SAVED: myInstance.notifyObservers(0);
+			case CloneMessage.SAVED: clone.notifyObservers(0);
 									 break;
 		}
 	}
@@ -304,18 +335,24 @@ public class Subject implements Observable {
 	 * Após ser enviado o master aguarda uma confirmação do clone para então enviar 
 	 * os pontos para todos os observers
 	 */
-	private static void sendMessageToMaster() throws UnknownHostException, IOException{
-		Socket s = new Socket(masterIp, portMaster);
-		
-		CloneMessage message = new CloneMessage();
-		message.setType(CloneMessage.SAVED);
-		
-		ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
-		out.writeObject(message);
-		out.flush();
-		out.close();
-		
-		s.close();	
+	private static void sendMessageToMaster() {
+		Socket s;
+		try {
+			s = new Socket(masterIp, portMaster);
+			CloneMessage message = new CloneMessage();
+			message.setType(CloneMessage.SAVED);
+			
+			ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
+			out.writeObject(message);
+			out.flush();
+			out.close();
+			
+			s.close();	
+		} catch (UnknownHostException e) {
+			
+		} catch (IOException e) {
+			
+		}
 	}
 
 	/**
@@ -332,12 +369,12 @@ public class Subject implements Observable {
 			CloneMessage message = new CloneMessage();
 
 			switch(type){
-				case CloneMessage.ADD: message.setType(CloneMessage.ADD);
-						message.setObserver(ip);
-						break;
-				case CloneMessage.SAVE: message.setType(CloneMessage.SAVE);
-						message.setPoints(points);
-						break;
+			case CloneMessage.ADD: message.setType(CloneMessage.ADD);
+					message.setObserver(ip);
+					break;
+			case CloneMessage.SAVE: message.setType(CloneMessage.SAVE);
+					message.setPoints(points);
+					break;
 			}
 			
 			ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
@@ -347,7 +384,8 @@ public class Subject implements Observable {
 			
 			s.close();	
 		} catch (IOException e) {
-			myInstance.notifyObservers(0);
+			System.out.println("This is the case");
+			clone.notifyObservers(0);
 		}
 	}
 	
@@ -384,13 +422,21 @@ public class Subject implements Observable {
 	@Override
 	public void notifyObservers(int type) {
 		for (String ip : observers) {
+			System.out.println(ip);
 			try {
 				Socket s = new Socket(ip, portObserver);
 				ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
 				
 				SubjectMessage message = new SubjectMessage();
-				message.setPoints(newPoints);
-				message.setType(change);
+				
+				switch(type){
+					case 0:	message.setPoints(newPoints);
+							message.setType(change);
+							break;
+					case 1: message.setIp(serverSocket.getInetAddress().getHostAddress());
+							message.setType(2);
+							break;
+				}
 				
 				out.writeObject(message);
 				out.flush();

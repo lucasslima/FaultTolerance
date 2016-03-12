@@ -29,7 +29,6 @@ public class Frame extends JFrame{
 	        super.paint(g);
 
 	        for(Point point : points){
-		        
 	        	// define the position
 		        int locX = point.getX();
 		        int locY = point.getY();

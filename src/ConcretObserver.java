@@ -9,17 +9,17 @@ import java.util.List;
 
 public class ConcretObserver implements Observer{
 	private static ServerSocket 	server;
-	private static Socket 			client;
-	private static final int 		port = 6969;
+	private static final int 		portSubject = 6969;
+	private static final int 		portObserver = 6970;
 	private static List<Point> 		points;
 	private static String 			ipServer = "localhost";
 	private static Frame 			frame;
 	private static ConcretObserver	concretObserver;
 	
 	public ConcretObserver() throws IOException{
-		server = new ServerSocket(port);
-		client = new Socket(ipServer, 6970);
-		points = new ArrayList<Point>();
+		server 		= new ServerSocket(portObserver);
+		points 		= new ArrayList<Point>();
+		frame 		= new Frame(new ArrayList<Point>());
 		
 		new Thread() {
 			@Override
@@ -41,7 +41,7 @@ public class ConcretObserver implements Observer{
 	protected static void listen() throws IOException {
 		while(true){
 			Socket socket = server.accept();
-	
+			
 			new Thread() {
 				@Override
 				public void run() {
@@ -51,7 +51,13 @@ public class ConcretObserver implements Observer{
 						SubjectMessage message = (SubjectMessage) in.readObject();
 						int type = message.getType();
 						List<Point> newPoints = message.getPoints();
-						concretObserver.update(type,newPoints);
+						
+						if(message.getType() == 2){
+							System.out.println("Getting new ip");
+							ipServer = message.getIp();
+						}
+						else
+							concretObserver.update(type,newPoints);
 						
 						socket.close();
 						
@@ -75,30 +81,34 @@ public class ConcretObserver implements Observer{
 					break;
 		}
 		
-		if(frame == null)
-			frame = new Frame(points);
-		else{
-			frame.setPoints(points);
-			frame.revalidate();
-			frame.repaint();
-		}
+		frame.setPoints(points);
+		frame.revalidate();
+		frame.repaint();
 	}
 	
+	@SuppressWarnings("resource")
 	public static void register() throws IOException {
+		Socket s = new Socket(ipServer, portSubject);
+		
 		ObserverMessage message = new ObserverMessage();
-		message.setIp(client.getLocalAddress().getHostAddress());
+		message.setIp(s.getLocalAddress().getHostAddress());
 		message.setType(0);
-		ObjectOutputStream out = new ObjectOutputStream(client.getOutputStream());
+		
+		ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
 		out.writeObject(message);
 		out.flush();
 		out.close();
 	}
 
+	@SuppressWarnings("resource")
 	public static void unRegister() throws IOException {
+		Socket s = new Socket(ipServer, portSubject);
+
 		ObserverMessage message = new ObserverMessage();
-		message.setIp(client.getLocalAddress().getHostAddress());
+		message.setIp(s.getLocalAddress().getHostAddress());
 		message.setType(1);
-		ObjectOutputStream out = new ObjectOutputStream(client.getOutputStream());
+		
+		ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
 		out.writeObject(message);
 		out.flush();
 		out.close();
