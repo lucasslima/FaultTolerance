@@ -6,6 +6,7 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 
+
 public class ConcretObserver implements Observer{
 	private static ServerSocket 	server;
 	private static Socket 			client;
@@ -19,6 +20,7 @@ public class ConcretObserver implements Observer{
 		server = new ServerSocket(port);
 		client = new Socket(ipServer, 6970);
 		points = new ArrayList<Point>();
+		
 		new Thread() {
 			@Override
 			public void run() {
@@ -66,16 +68,10 @@ public class ConcretObserver implements Observer{
 	public void update(int type,List<Point> newPoints) {
 		
 		switch(type){
-			case 0: System.out.println("Tamanho dos novos pontos: " + newPoints.size());	
-					System.out.println("Tamanho dos pontos atuais: " + points.size());
-					points.addAll(newPoints);
-					System.out.println("Tamanho depois de atualizado: " + points.size());
+			case 0: points.addAll(newPoints);
 					break;
-			case 1: System.out.println("Remove all");
-					System.out.println("Tamanho dos novos pontos: " + newPoints.size());	
-					System.out.println("Tamanho dos pontos atuais: " + points.size());
-					points.removeAll(newPoints);
-					System.out.println("Tamanho depois de atualizado: " + points.size());
+			case 1: for(Point point : newPoints)
+						points.remove(point.getIndex());
 					break;
 		}
 		
@@ -87,7 +83,7 @@ public class ConcretObserver implements Observer{
 			frame.repaint();
 		}
 	}
-
+	
 	public static void register() throws IOException {
 		ObserverMessage message = new ObserverMessage();
 		message.setIp(client.getLocalAddress().getHostAddress());

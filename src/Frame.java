@@ -6,13 +6,13 @@ import java.util.List;
 import javax.swing.JFrame;
 
 public class Frame extends JFrame{
-	private static final long serialVersionUID = 1L;
-	private List<Point> points; 
-	private final int  dimensionsFrame = 1000;
-	private final int  dimensionsDot   = 5;
+	private static final long 	serialVersionUID = 1L;
+	private List<Point> 		points; 
+	private final int  			dimensionsFrame = 1000;
+	private final int  			dimensionsDot   = 5;
 	
-	public Frame(List<Point> points2){
-		this.points = points2;
+	public Frame(List<Point> points){
+		this.points = points;
 		
 		this.setPreferredSize(new Dimension(dimensionsFrame, dimensionsFrame));
         this.pack();

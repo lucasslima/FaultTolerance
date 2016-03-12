@@ -2,10 +2,19 @@ import java.io.Serializable;
 
 public class Point implements Serializable, Comparable<Point>{
 	private static final long serialVersionUID = 1L;
+	private int index; 
 	private int id;
 	private int cor;
 	private int x;
 	private int y;
+	
+	public int getIndex() {
+		return index;
+	}
+	
+	public void setIndex(int index) {
+		this.index = index;
+	}
 	
 	public int getId() {
 		return id;

@@ -13,25 +13,24 @@ public class Subject implements Observable {
 	private static List<Point> 	points;
 	private static List<Point> 	newPoints;
 	private static List<String> observers;
-	private static int 			numPoints = 1000;
+	private static int 			numPoints = 500;
 	private static ServerSocket serverSocket;
 	private static Random 		random;
 	private static final int 	port = 6969;
 	private static final int 	minimum = 150;
-	private static final int 	maximum = 500;
+	private static final int 	maximum = 350;
 	private static int 			change;
 	private static Subject		subject;
 	
 	public Subject() throws IOException{
-		serverSocket = new ServerSocket(6970);
-		observers = new ArrayList<String>();
-		points = new ArrayList<Point>();
-		newPoints = new ArrayList<Point>();
-		random = new Random();
+		serverSocket 		= new ServerSocket(6970);
+		observers 			= new ArrayList<String>();
+		points 				= new ArrayList<Point>();
+		newPoints 			= new ArrayList<Point>();
+		random 				= new Random();
 		
 		for (int i = 0; i < numPoints; i++) {
 			Point point = new Point();
-//			setSeed();
 			int x = random.nextInt(1000);
 			int y = random.nextInt(1000);
 			int cor = random.nextInt(5);
@@ -60,8 +59,7 @@ public class Subject implements Observable {
 			public void run() {
 				try {
 					while(true){
-//						setSeed();
-						int seg = random.nextInt(500);
+						int seg = random.nextInt(350);
 						Thread.sleep(seg);
 						changePoints();
 						notifyObservers();
@@ -79,32 +77,30 @@ public class Subject implements Observable {
 	}
 
 	protected static void changePoints() {
-//		setSeed();
 		change = random.nextInt(2);
 		switch (change) {
 		case 0:
 			for (int i = 0; i < getNumPointToChange(); i++) {
 				Point point = new Point();
-//				setSeed();
 				int x = random.nextInt(1000);
 				int y = random.nextInt(1000);
 				int cor = random.nextInt(5);
 				point.setX(x);
 				point.setY(y);
 				point.setCor(cor);
-				points.add(point);
 				newPoints.add(point);
 
 			}
+			points.addAll(newPoints);
 			numPoints = points.size();
 			break;
 
 		case 1:
+			Point [] currentPoints = (Point[]) points.toArray(new Point[numPoints]);
 			for (int i = 0; i < getNumpointtoremove(); i++) {
 				int aux;
-//				setSeed();
 				aux = random.nextInt(numPoints);
-				newPoints.add(points.get(aux));
+				newPoints.add(currentPoints[aux]);
 			}
 			points.removeAll(newPoints);
 			numPoints = points.size();
@@ -140,7 +136,6 @@ public class Subject implements Observable {
 		}
 	}
 	
-	
 	@Override
 	public void registerObserver(String ip) throws UnknownHostException, IOException {
 		observers.add(ip);
@@ -173,6 +168,7 @@ public class Subject implements Observable {
 				observers.remove(ip);
 			}
 		}
+		newPoints.clear();
 	}
 	
 	private void notifyObserverJustRegistered(String ip) throws UnknownHostException, IOException{
@@ -190,7 +186,6 @@ public class Subject implements Observable {
 	}
 
 	public static int getNumPointToChange() {
-//		setSeed();
 		int n = maximum - minimum + 1;
 		int i = random.nextInt() % n;
 		int randomNum = minimum + i;
@@ -198,13 +193,8 @@ public class Subject implements Observable {
 	}
 
 	public static int getNumpointtoremove() {
-//		setSeed();
 		int randomNum = random.nextInt(numPoints);
 		return Math.abs(randomNum);
 	}
 
-//	public static void setSeed(){
-//		long seed = System.currentTimeMillis();
-//		random.setSeed(seed);
-//	}
 }
