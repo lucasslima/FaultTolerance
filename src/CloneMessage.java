@@ -3,8 +3,10 @@ import java.util.List;
 
 public class CloneMessage implements Serializable{
 	private static final long 	serialVersionUID = 1L;
-	public static final int 	ACK = 0;
-	public static final int 	REQUEST = 1; 
+	public static final int 	SAVED = 0;
+	public static final int 	CONFIRMATION = 1; 
+	public static final int 	ADD = 2;
+	public static final int 	SAVE = 3; 
 	private int 				type; 
 	private List<Point> 		points;
 	private String 				observer; 

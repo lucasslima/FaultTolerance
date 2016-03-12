@@ -90,6 +90,7 @@ public class Subject implements Observable {
 						Thread.sleep(seg);
 						changePoints();
 						notifyObservers();
+						//TODO send message to clone
 					}
 
 				} catch (InterruptedException e) {					
@@ -145,12 +146,12 @@ public class Subject implements Observable {
 							CloneMessage message = (CloneMessage) object;
 							
 							switch(message.getType()){
-								case 0: observers.add(message.getObserver());
-										break;
-								case 1: points.clear();
-										points = message.getPoints();
-										sendMessageToMaster();
-										break;
+								case CloneMessage.ADD: 	observers.add(message.getObserver());
+														break;
+								case CloneMessage.SAVE: points.clear();
+														points = message.getPoints();
+														sendMessageToMaster();
+														break;
 							}
 						}
 						
@@ -173,15 +174,12 @@ public class Subject implements Observable {
 				public void run() {
 					try {
 						ObjectInputStream in = new ObjectInputStream(client.getInputStream());
-						
-						ObserverMessage message = (ObserverMessage) in.readObject();;
-						switch (message.getType()) {
-						case 0:	subject.registerObserver(message.getIp());
-								break;
-						case 1:	subject.unregisterObserver(message.getIp());
-								break;
-
-						}
+						Object object = in.readObject();
+												
+						if(object instanceof ObserverMessage)
+							getMessageFromSubject(object);
+						else if(object instanceof CloneMessage)
+							getMessageFromClone(object);
 						
 					} catch (IOException e) {
 						e.printStackTrace();
@@ -193,19 +191,30 @@ public class Subject implements Observable {
 		}
 	}
 	
-	private static void getMessageFromSubject(){
-		
+	private static void getMessageFromSubject(Object object) throws UnknownHostException, IOException{
+		ObserverMessage message = (ObserverMessage) object;
+		switch (message.getType()) {
+			case 0:	subject.registerObserver(message.getIp());
+					break;
+			case 1:	subject.unregisterObserver(message.getIp());
+					break;
+		}		
 	}
 	
-	private static void getMessageFromClone(){
+	private static void getMessageFromClone(Object object){
+		CloneMessage message = (CloneMessage) object;
 		
+		switch(message.getType()){
+			case CloneMessage.SAVED: subject.notifyObservers();
+									 break;
+		}
 	}
 	
 	private static void sendMessageToMaster() throws UnknownHostException, IOException{
 		Socket s = new Socket(masterIp, port);
 		
 		CloneMessage message = new CloneMessage();
-		message.setType(CloneMessage.ACK);
+		message.setType(CloneMessage.SAVED);
 		
 		ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
 		out.writeObject(message);
