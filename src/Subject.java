@@ -21,6 +21,10 @@ public class Subject implements Observable {
 	private static final int 	maximum = 350;
 	private static int 			change;
 	private static Subject		subject;
+	private static Thread		threadServer; 
+	private static Thread 		threadClone;
+	private static String 		masterIp;
+	private static boolean 		amIMaster; 
 	
 	public Subject() throws IOException{
 		serverSocket 		= new ServerSocket(6970);
@@ -28,19 +32,42 @@ public class Subject implements Observable {
 		points 				= new ArrayList<Point>();
 		newPoints 			= new ArrayList<Point>();
 		random 				= new Random();
+		amIMaster			= true; 
 		
-		for (int i = 0; i < numPoints; i++) {
-			Point point = new Point();
-			int x = random.nextInt(1000);
-			int y = random.nextInt(1000);
-			int cor = random.nextInt(5);
-			point.setX(x);
-			point.setY(y);
-			point.setCor(cor);
-			points.add(point);
+		if(amIMaster){
+			for (int i = 0; i < numPoints; i++) {
+				Point point = new Point();
+				int x = random.nextInt(1000);
+				int y = random.nextInt(1000);
+				int cor = random.nextInt(5);
+				point.setX(x);
+				point.setY(y);
+				point.setCor(cor);
+				points.add(point);
+			}
+			startMaster();
+		} else 
+			startClone();
+	}
 
-		}
-		
+	public static void main(String[] args) throws IOException {
+		subject = new Subject();
+	}
+
+	public static void startClone(){
+		new Thread(){
+			@Override
+			public void run(){
+				try {
+					listenFromMaster();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}.start();
+	}
+	
+	public void startMaster(){
 		//inicia o servidor para ficar ouvindo os clientes em uma thread 
 		new Thread() {
 			@Override
@@ -71,11 +98,7 @@ public class Subject implements Observable {
 			}
 		}.start();
 	}
-
-	public static void main(String[] args) throws IOException {
-		subject = new Subject();
-	}
-
+	
 	protected static void changePoints() {
 		change = random.nextInt(2);
 		switch (change) {
@@ -108,6 +131,40 @@ public class Subject implements Observable {
 		}
 	}
 
+	public static void listenFromMaster() throws IOException{
+		while(true){ 
+			Socket s = serverSocket.accept();
+			new Thread() {
+				@Override
+				public void run() {
+					try {
+						ObjectInputStream in = new ObjectInputStream(s.getInputStream());
+						Object object = in.readObject();
+						
+						if(object instanceof CloneMessage){
+							CloneMessage message = (CloneMessage) object;
+							
+							switch(message.getType()){
+								case 0: observers.add(message.getObserver());
+										break;
+								case 1: points.clear();
+										points = message.getPoints();
+										sendMessageToMaster();
+										break;
+							}
+						}
+						
+						
+					} catch (IOException e) {
+						e.printStackTrace();
+					} catch (ClassNotFoundException e) {
+						e.printStackTrace();
+					}
+				}
+			}.start();
+		}
+	}
+	
 	protected static void listen() throws IOException {
 		while(true){
 			Socket client = serverSocket.accept();
@@ -134,6 +191,28 @@ public class Subject implements Observable {
 				}
 			}.start();
 		}
+	}
+	
+	private static void getMessageFromSubject(){
+		
+	}
+	
+	private static void getMessageFromClone(){
+		
+	}
+	
+	private static void sendMessageToMaster() throws UnknownHostException, IOException{
+		Socket s = new Socket(masterIp, port);
+		
+		CloneMessage message = new CloneMessage();
+		message.setType(CloneMessage.ACK);
+		
+		ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
+		out.writeObject(message);
+		out.flush();
+		out.close();
+		
+		s.close();	
 	}
 	
 	@Override
