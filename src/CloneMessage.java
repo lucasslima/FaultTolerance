@@ -8,11 +8,21 @@ public class CloneMessage implements Serializable{
 	public static final int 	ADD = 2;
 	public static final int 	SAVE = 3; 
 	public static final int 	REGISTER = 4; 
+	public static final int 	NEW = 5; 
 	private int 				type; 
 	private List<Point> 		points;
 	private String 				observer; 
+	private List<String> 		observers; 
 	private String 				cloneIp; 
 	private int 				clonePort; 
+	
+	public List<String> getObservers() {
+		return observers;
+	}
+
+	public void setObservers(List<String> observers) {
+		this.observers = observers;
+	}
 	
 	public int getClonePort() {
 		return clonePort;
