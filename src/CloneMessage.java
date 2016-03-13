@@ -7,9 +7,27 @@ public class CloneMessage implements Serializable{
 	public static final int 	CONFIRMATION = 1; 
 	public static final int 	ADD = 2;
 	public static final int 	SAVE = 3; 
+	public static final int 	REGISTER = 4; 
 	private int 				type; 
 	private List<Point> 		points;
 	private String 				observer; 
+	private String 				cloneIp; 
+	private int 				clonePort; 
+	
+	public int getClonePort() {
+		return clonePort;
+	}
+	
+	public void setClonePort(int clonePort) {
+		this.clonePort = clonePort;
+	}
+	
+	public String getCloneIp() {
+		return cloneIp;
+	}
+	public void setCloneIp(String cloneIp) {
+		this.cloneIp = cloneIp;
+	}
 	
 	public String getObserver() {
 		return observer;

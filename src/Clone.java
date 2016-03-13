@@ -6,74 +6,86 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.TreeMap;
 
 
 public class Clone implements Observable {
-	private static List<Point> 	points;
-	private static List<Point> 	newPoints;
-	private static List<String> observers;
-	private static int 			numPoints = 500;
-	private static ServerSocket serverSocket;
-	private static Random 		random;
-	private static final int 	portMaster = 6969;
-	private static final int 	portObserver = 6970;
-	private static final int 	portClone = 6971;
-	private static final int 	minimum = 150;
-	private static final int 	maximum = 350;
-	private static int 			change;
-	private static Clone		clone;
-	private static Thread 		threadToCheckMaster;
-	private static Thread 		threadMaster;
-	private static Thread 		threadClone;
-	private static String 		masterIp;
-	private static String 		cloneIp;
-	private static boolean 		amIMaster; 
-	private static long 		timeLastMessage; 
-	private static boolean		firstCommunication;
+	private static List<Point> 			points;
+	private static List<Point> 			newPoints;
+	private static List<String> 		observers;
+	private static Map<String,Integer> 	clones;
+	private static int 					numPoints = 500;
+	private static final int 			minimum = 150;
+	private static final int 			maximum = 350;
+	private static final int 			SUBJECT = 0;
+	private static final int 			CLONE = 2;
+	private static ServerSocket 		serverSocket;
+	private static Random 				random;
+	private static final int 			portMaster = 6969;
+	private static final int 			portObserver = 6970;
+	private static final int 			portClone = 6971;
+	private static int 					change;
+	private static Clone				myInstance;
+	private static Thread 				threadToCheckMaster;
+	private static Thread 				threadMaster;
+	private static Thread 				threadClone;
+	private static String 				masterIp;
+	private static String 				cloneIp;
+	private static boolean 				amIMaster; 
+	private static long 				timeLastMessage; 
+	private static boolean				firstCommunication;
+	private static int 					whoAmI; 
 	
 	public Clone() throws IOException{
 		serverSocket 		= new ServerSocket(portClone);
 		observers 			= new ArrayList<String>();
 		points 				= new ArrayList<Point>();
 		newPoints 			= new ArrayList<Point>();
+		clones				= new TreeMap<String,Integer>();
 		random 				= new Random();
 		amIMaster			= false; 
 		masterIp			= "localhost";
-		cloneIp				= "localhost";
 		firstCommunication  = true; 
-		
-		if(amIMaster){
-			for (int i = 0; i < numPoints; i++) {
-				Point point = new Point();
-				int x = random.nextInt(1000);
-				int y = random.nextInt(1000);
-				int cor = random.nextInt(5);
-				point.setX(x);
-				point.setY(y);
-				point.setCor(cor);
-				points.add(point);
-			}
-			threadMaster = new Thread(){
-				@Override
-				public void run(){
-					startMaster();
-				}
-			};
-			threadMaster.start();
-		} else {
-			threadClone = new Thread(){
-				@Override
-				public void run(){
-					startClone();
-				}
-			};
-			threadClone.start();
+		whoAmI				= CLONE;
+				
+		switch(whoAmI){
+			case SUBJECT: 	cloneIp = "localhost";
+							clones.put(cloneIp,portClone);
+				
+							for (int i = 0; i < numPoints; i++) {
+								Point point = new Point();
+								int x = random.nextInt(1000);
+								int y = random.nextInt(1000);
+								int cor = random.nextInt(5);
+								point.setX(x);
+								point.setY(y);
+								point.setCor(cor);
+								points.add(point);
+							}
+							threadMaster = new Thread(){
+								@Override
+								public void run(){
+									startMaster();
+								}
+							};
+							threadMaster.start();
+							break;
+							
+			case CLONE: 	threadClone = new Thread(){
+								@Override
+								public void run(){
+									startClone();
+								}
+							};
+							threadClone.start();
+							break;
 		}
 	}
 
 	public static void main(String[] args) throws IOException {
-		clone = new Clone();
+		myInstance = new Clone();
 	}
 
 	/**
@@ -137,7 +149,7 @@ public class Clone implements Observable {
 						Thread.sleep(seg);
 						changePoints();
 //						sendMessageToClone(CloneMessage.SAVE,null);
-						clone.notifyObservers(0);
+						myInstance.notifyObservers(0);
 					}
 
 				} catch (InterruptedException e) {					
@@ -249,12 +261,12 @@ public class Clone implements Observable {
 	 * O clone agora assumirá o controle
 	 * @throws InterruptedException 
 	 */
-	@SuppressWarnings("deprecation")
 	private static void setNewMaster() throws InterruptedException{
-		System.out.println("Set new master");
 		threadClone.interrupt();
 		amIMaster = true;
-		cloneIp = null;
+		cloneIp = observers.get(0);
+		//TODO sent message to observer to make him a clone
+		clones.put(cloneIp, portObserver);
 		threadMaster = new Thread(){
 			@Override
 			public void run(){
@@ -262,7 +274,7 @@ public class Clone implements Observable {
 			}
 		};
 		threadMaster.start();
-		clone.notifyObservers(1);
+		myInstance.notifyObservers(1);
 		
 		
 	}
@@ -279,18 +291,19 @@ public class Clone implements Observable {
 	private static void getMessageFromMaster(Object object) throws UnknownHostException, IOException{
 		CloneMessage message = (CloneMessage) object;
 		
-		switch(message.getType()){
-			case CloneMessage.ADD: 	observers.add(message.getObserver());
-									break;
-			case CloneMessage.SAVE:	timeLastMessage = System.currentTimeMillis();
-									if(firstCommunication){
-										firstCommunication = false; 
-										threadToCheckMaster.start();
-									}
-									points.clear();
-									points = message.getPoints();
-									sendMessageToMaster();
-									break;
+		switch(message.getType()){										
+			case CloneMessage.ADD: 		observers.add(message.getObserver());
+										break;
+										
+			case CloneMessage.SAVE:		timeLastMessage = System.currentTimeMillis();
+										if(firstCommunication){
+											firstCommunication = false; 
+											threadToCheckMaster.start();
+										}
+										points.clear();
+										points = message.getPoints();
+										sendMessageToMaster();
+										break;
 		}
 	}
 	
@@ -306,9 +319,9 @@ public class Clone implements Observable {
 	private static void getMessageFromObserver(Object object) throws UnknownHostException, IOException{
 		ObserverMessage message = (ObserverMessage) object;
 		switch (message.getType()) {
-			case 0:	clone.registerObserver(message.getIp());
+			case 0:	myInstance.registerObserver(message.getIp());
 					break;
-			case 1:	clone.unregisterObserver(message.getIp());
+			case 1:	myInstance.unregisterObserver(message.getIp());
 					break;
 		}		
 	}
@@ -324,8 +337,11 @@ public class Clone implements Observable {
 		CloneMessage message = (CloneMessage) object;
 		
 		switch(message.getType()){
-			case CloneMessage.SAVED: clone.notifyObservers(0);
-									 break;
+			case CloneMessage.REGISTER: clones.put(message.getCloneIp(), message.getClonePort());
+										break;
+										
+			case CloneMessage.SAVED: 	myInstance.notifyObservers(0);
+									 	break;
 		}
 	}
 	
@@ -364,7 +380,7 @@ public class Clone implements Observable {
 	private static void sendMessageToClone(int type, String ip){
 		Socket s;
 		try {
-			s = new Socket(cloneIp, portClone);
+			s = new Socket(cloneIp, clones.get(cloneIp));
 			
 			CloneMessage message = new CloneMessage();
 
@@ -384,8 +400,25 @@ public class Clone implements Observable {
 			
 			s.close();	
 		} catch (IOException e) {
-			System.out.println("This is the case");
-			clone.notifyObservers(0);
+			System.out.println("No connection");
+			updateClones();
+			myInstance.notifyObservers(0);
+		}
+	}
+	
+	private static void updateClones(){
+		clones.remove(cloneIp);
+		if(clones.size() >= 1){
+			leaveFor1:
+			for(String key : clones.keySet()){
+				cloneIp = key; 
+				break leaveFor1;
+			}
+		} else {
+			int index = 0; 
+			while(cloneIp.equals(observers.get(index)))
+				cloneIp = observers.get(++index);
+			//TODO send message to clone
 		}
 	}
 	
@@ -495,5 +528,5 @@ public class Clone implements Observable {
 		int randomNum = random.nextInt(numPoints);
 		return Math.abs(randomNum);
 	}
-
+	
 }
