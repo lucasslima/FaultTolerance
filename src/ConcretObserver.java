@@ -161,7 +161,7 @@ public class ConcretObserver implements Observable, Observer {
 		ports 				= new Stack<Integer>();
 		random 				= new Random();
 		masterIp			= "200.239.139.61";
-		cloneIp 			= null; 			
+		cloneIp				= null;
 				
 		threadObserver = new Thread(){
 			@Override
@@ -349,18 +349,26 @@ public class ConcretObserver implements Observable, Observer {
 			new Thread() {
 				@Override
 				public void run() {
+					System.out.println("Recebi mensagem");
 					try {
 						ObjectInputStream in = new ObjectInputStream(client.getInputStream());
 						Object object = in.readObject();
 												
 						if(object instanceof ObserverMessage)
+						{
 							getMessageFromObserver(object);
+							System.out.println("ObserverMessage");
+						}
 						else if(object instanceof CloneMessage){
 							getMessageFromClone(object);
+							getMessageFromMaster(object); //Gambiarra, a mensagem que vem do clone quando ele ja era master.
+							System.out.println("CloneMessage");
 						}
 						else if(object instanceof SubjectMessage)
+						{
 							getMessageFromMaster(object);
-						
+							System.out.println("SubjectMessage");
+						}
 					} catch (IOException e) {
 						e.printStackTrace();
 					} catch (ClassNotFoundException e) {
@@ -405,18 +413,10 @@ public class ConcretObserver implements Observable, Observer {
 			CloneMessage message = (CloneMessage) object;
 			
 			switch(message.getType()){	
-				case CloneMessage.REGISTER: if(cloneIp == null){
-												cloneIp = message.getCloneIp();
-												sendMessageToClone(CloneMessage.NEW,cloneIp);
-											}
-											clones.addElement(message.getCloneIp());
-											break;
-			
-				case CloneMessage.SAVED: 	myInstance.notifyObservers(0);
-											break;
-											
-				case CloneMessage.NEW:		points.addAll( message.getPoints() );
-											observers.addAll(message.getObservers() );
+				case CloneMessage.NEW:		
+											System.out.println("Acho que vou virar um clone...");
+											points = message.getPoints();
+											observers = message.getObservers();
 											threadToCheckMaster.start();
 											break;
 			
@@ -425,10 +425,19 @@ public class ConcretObserver implements Observable, Observer {
 											
 				case CloneMessage.SAVE:		timeLastMessage = System.currentTimeMillis();
 											points.clear();
-											points.addAll(message.getPoints() );
+											points = message.getPoints();
 											sendMessageToMaster(CloneMessage.SAVED);
 											break;
-			}
+				case CloneMessage.REGISTER: if(cloneIp == null){
+											cloneIp = message.getCloneIp();
+											sendMessageToClone(CloneMessage.NEW,cloneIp);
+											}
+											clones.addElement(message.getCloneIp());
+											break;
+								
+				case CloneMessage.SAVED: 	myInstance.notifyObservers(0);
+											break;
+											}
 		} else {
 			SubjectMessage message = (SubjectMessage) object;
 			
@@ -471,15 +480,18 @@ public class ConcretObserver implements Observable, Observer {
 	 */
 	private static void getMessageFromClone(Object object){
 		CloneMessage message = (CloneMessage) object;
+	
 		switch(message.getType()){
-			case CloneMessage.REGISTER: if(cloneIp == null){
+			case CloneMessage.REGISTER: System.out.println("REGISTER");
+										if(cloneIp == null){
 											cloneIp = message.getCloneIp();
 											sendMessageToClone(CloneMessage.NEW,cloneIp);
 										}
 										clones.addElement(message.getCloneIp());
 										break;
 										
-			case CloneMessage.SAVED: 	myInstance.notifyObservers(0);
+			case CloneMessage.SAVED: 	System.out.println("SAVED");
+										myInstance.notifyObservers(0);
 									 	break;
 		}
 	}
