@@ -1,13 +1,23 @@
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.Inet4Address;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.Stack;
+import java.util.concurrent.TimeoutException;
 
 public class Clone implements Observable {
 	private static List<Point> 			points;
@@ -20,8 +30,10 @@ public class Clone implements Observable {
 	private static final int 			SUBJECT = 0;
 	private static final int 			CLONE = 2;
 	private static ServerSocket 		serverSocket;
+	private static ServerSocket 		checkMasterSocket;
 	private static Random 				random;
 	private static final int 			port = 6969;
+	private static final int 			checkMasterPort = 6970;
 	private static int 					change;
 	private static Clone				myInstance;
 	private static Thread 				threadToCheckMaster;
@@ -43,7 +55,11 @@ public class Clone implements Observable {
 		masterIp			= "200.239.139.61";
 		whoAmI				= CLONE;
 		cloneIp				= null;
-				
+		checkMasterSocket = new ServerSocket(checkMasterPort);
+		checkMasterSocket.setSoTimeout(3000);
+		
+		checkExistingMasters();
+		
 		switch(whoAmI){
 			case SUBJECT: 	serverSocket = new ServerSocket(port);
 							for (int i = 0; i < numPoints; i++) {
@@ -124,6 +140,7 @@ public class Clone implements Observable {
 			public void run() {
 				try {
 					listen();
+					udpListen();
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -243,6 +260,53 @@ public class Clone implements Observable {
 					} catch (IOException e) {
 						e.printStackTrace();
 					} catch (ClassNotFoundException e) {
+						e.printStackTrace();
+					}
+				}
+			}.start();
+			
+		}
+	}
+	protected static void udpListen() throws IOException{
+		DatagramSocket dsocket = new DatagramSocket();
+		while(true){
+			new Thread(){
+				public void run(){
+					try
+				    {
+				      byte[] recvBuf = new byte[5000];
+				      DatagramPacket receivepacket = new DatagramPacket(recvBuf,
+				                                                 recvBuf.length);
+				      dsocket.receive(receivepacket);
+				      int byteCount = receivepacket.getLength();
+				      ByteArrayInputStream receivebyteStream = new
+				                                  ByteArrayInputStream(recvBuf);
+				      ObjectInputStream is = new
+				           ObjectInputStream(new BufferedInputStream(receivebyteStream));
+				      CheckMasterMessage o = (CheckMasterMessage) is.readObject();
+				      is.close();
+				      if (o.getType() == CheckMasterMessage.CHECK){
+				    	  Socket s = new Socket(o.getIP(), checkMasterPort);
+							
+							CheckMasterMessage message = new CheckMasterMessage();
+							message.setIP(InetAddress.getLocalHost().getHostAddress());
+							message.setType(CheckMasterMessage.SUBJECT);
+							
+							ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
+							out.writeObject(message);
+							out.flush();
+							out.close();
+							
+							s.close();
+				      }
+				    }
+				    catch (IOException e)
+				    {
+				      System.err.println("Exception:  " + e);
+				      e.printStackTrace();
+				    }
+					catch (ClassNotFoundException e){
+						System.err.println("Exception:  " + e);
 						e.printStackTrace();
 					}
 				}
@@ -420,6 +484,46 @@ public class Clone implements Observable {
 			myInstance.notifyObservers(UPDATE);
 			if(cloneIp != null || clones.size() != 0)
 				updateClones();
+		}
+	}
+	
+	private static void checkExistingMasters(){
+		Socket s;
+		try {
+			DatagramSocket dSock = new DatagramSocket();
+			
+			CheckMasterMessage message = new CheckMasterMessage();
+			message.setIP(InetAddress.getLocalHost().getHostAddress());
+			message.setType(CheckMasterMessage.CHECK);
+			
+			InetAddress group = InetAddress.getByName("200.239.139.0");
+			
+			ByteArrayOutputStream byteStream = new ByteArrayOutputStream(5000);
+			ObjectOutputStream os = new ObjectOutputStream(new BufferedOutputStream(byteStream));
+			os.flush();
+			os.writeObject(message);
+			os.flush();
+			byte[] sendBuffer = byteStream.toByteArray();
+			
+			DatagramPacket packet = new DatagramPacket(sendBuffer, sendBuffer.length,group,port);
+			
+			dSock.send(packet);
+		    os.close();
+		    try{
+		    	s = checkMasterSocket.accept();
+		    	ObjectInputStream in = new ObjectInputStream(s.getInputStream());
+				CheckMasterMessage response = (CheckMasterMessage) in.readObject();
+				masterIp = response.getIP();
+				whoAmI = CLONE;
+		    	
+		    }  catch (SocketTimeoutException e){
+		    	whoAmI = SUBJECT;
+			} catch (Exception e){
+				e.printStackTrace();
+			}
+		    
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
 	}
 	

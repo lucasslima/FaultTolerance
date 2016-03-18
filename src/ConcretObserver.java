@@ -1,121 +1,3 @@
-//import java.io.IOException;
-//import java.io.ObjectInputStream;
-//import java.io.ObjectOutputStream;
-//import java.net.ServerSocket;
-//import java.net.Socket;
-//import java.util.ArrayList;
-//import java.util.List;
-//
-//
-//public class ConcretObserver implements Observer{
-//	private static ServerSocket 	server;
-//	private static final int 		portSubject = 6969;
-//	private static final int 		portObserver = 6970;
-//	private static List<Point> 		points;
-//	private static String 			ipServer = "localhost";
-//	private static Frame 			frame;
-//	private static ConcretObserver	concretObserver;
-//	
-//	public ConcretObserver() throws IOException{
-//		server 		= new ServerSocket(portObserver);
-//		points 		= new ArrayList<Point>();
-//		frame 		= new Frame(new ArrayList<Point>());
-//		
-//		new Thread() {
-//			@Override
-//			public void run() {
-//				try {
-//					listen();
-//				} catch (IOException e) {
-//					e.printStackTrace();
-//				}
-//			}
-//		}.start();
-//		register();
-//	}
-//
-//	public static void main(String[] args) throws IOException {
-//		concretObserver = new ConcretObserver();
-//	}
-//
-//	protected static void listen() throws IOException {
-//		while(true){
-//			Socket socket = server.accept();
-//			
-//			new Thread() {
-//				@Override
-//				public void run() {
-//					try {
-//						ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
-//						
-//						SubjectMessage message = (SubjectMessage) in.readObject();
-//						int type = message.getType();
-//						List<Point> newPoints = message.getPoints();
-//						
-//						if(message.getType() == 2){
-//							System.out.println("Getting new ip");
-//							ipServer = message.getIp();
-//						}
-//						else
-//							concretObserver.update(type,newPoints);
-//						
-//						socket.close();
-//						
-//					} catch (IOException | ClassNotFoundException e) {
-//						e.printStackTrace();
-//					}
-//	
-//				}
-//			}.start();
-//		}
-//	}
-//
-//	@Override
-//	public void update(int type,List<Point> newPoints) {
-//		
-//		switch(type){
-//			case 0: points.addAll(newPoints);
-//					break;
-//			case 1: for(Point point : newPoints)
-//						points.remove(point.getIndex());
-//					break;
-//		}
-//		
-//		frame.setPoints(points);
-//		frame.revalidate();
-//		frame.repaint();
-//	}
-//	
-//	@SuppressWarnings("resource")
-//	public static void register() throws IOException {
-//		Socket s = new Socket(ipServer, portSubject);
-//		
-//		ObserverMessage message = new ObserverMessage();
-//		message.setIp(s.getLocalAddress().getHostAddress());
-//		message.setType(0);
-//		
-//		ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
-//		out.writeObject(message);
-//		out.flush();
-//		out.close();
-//	}
-//
-//	@SuppressWarnings("resource")
-//	public static void unRegister() throws IOException {
-//		Socket s = new Socket(ipServer, portSubject);
-//
-//		ObserverMessage message = new ObserverMessage();
-//		message.setIp(s.getLocalAddress().getHostAddress());
-//		message.setType(1);
-//		
-//		ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
-//		out.writeObject(message);
-//		out.flush();
-//		out.close();
-//
-//	}
-//}
-
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -161,7 +43,7 @@ public class ConcretObserver implements Observable, Observer {
 		ports 				= new Stack<Integer>();
 		random 				= new Random();
 		masterIp			= "200.239.139.61";
-		cloneIp				= null;
+		cloneIp 			= null; 			
 				
 		threadObserver = new Thread(){
 			@Override
@@ -349,26 +231,18 @@ public class ConcretObserver implements Observable, Observer {
 			new Thread() {
 				@Override
 				public void run() {
-					System.out.println("Recebi mensagem");
 					try {
 						ObjectInputStream in = new ObjectInputStream(client.getInputStream());
 						Object object = in.readObject();
 												
 						if(object instanceof ObserverMessage)
-						{
 							getMessageFromObserver(object);
-							System.out.println("ObserverMessage");
-						}
 						else if(object instanceof CloneMessage){
 							getMessageFromClone(object);
-							getMessageFromMaster(object); //Gambiarra, a mensagem que vem do clone quando ele ja era master.
-							System.out.println("CloneMessage");
 						}
 						else if(object instanceof SubjectMessage)
-						{
 							getMessageFromMaster(object);
-							System.out.println("SubjectMessage");
-						}
+						
 					} catch (IOException e) {
 						e.printStackTrace();
 					} catch (ClassNotFoundException e) {
@@ -413,10 +287,18 @@ public class ConcretObserver implements Observable, Observer {
 			CloneMessage message = (CloneMessage) object;
 			
 			switch(message.getType()){	
-				case CloneMessage.NEW:		
-											System.out.println("Acho que vou virar um clone...");
-											points = message.getPoints();
-											observers = message.getObservers();
+				case CloneMessage.REGISTER: if(cloneIp == null){
+												cloneIp = message.getCloneIp();
+												sendMessageToClone(CloneMessage.NEW,cloneIp);
+											}
+											clones.addElement(message.getCloneIp());
+											break;
+			
+				case CloneMessage.SAVED: 	myInstance.notifyObservers(0);
+											break;
+											
+				case CloneMessage.NEW:		points.addAll( message.getPoints() );
+											observers.addAll(message.getObservers() );
 											threadToCheckMaster.start();
 											break;
 			
@@ -425,19 +307,10 @@ public class ConcretObserver implements Observable, Observer {
 											
 				case CloneMessage.SAVE:		timeLastMessage = System.currentTimeMillis();
 											points.clear();
-											points = message.getPoints();
+											points.addAll(message.getPoints() );
 											sendMessageToMaster(CloneMessage.SAVED);
 											break;
-				case CloneMessage.REGISTER: if(cloneIp == null){
-											cloneIp = message.getCloneIp();
-											sendMessageToClone(CloneMessage.NEW,cloneIp);
-											}
-											clones.addElement(message.getCloneIp());
-											break;
-								
-				case CloneMessage.SAVED: 	myInstance.notifyObservers(0);
-											break;
-											}
+			}
 		} else {
 			SubjectMessage message = (SubjectMessage) object;
 			
@@ -480,18 +353,15 @@ public class ConcretObserver implements Observable, Observer {
 	 */
 	private static void getMessageFromClone(Object object){
 		CloneMessage message = (CloneMessage) object;
-	
 		switch(message.getType()){
-			case CloneMessage.REGISTER: System.out.println("REGISTER");
-										if(cloneIp == null){
+			case CloneMessage.REGISTER: if(cloneIp == null){
 											cloneIp = message.getCloneIp();
 											sendMessageToClone(CloneMessage.NEW,cloneIp);
 										}
 										clones.addElement(message.getCloneIp());
 										break;
 										
-			case CloneMessage.SAVED: 	System.out.println("SAVED");
-										myInstance.notifyObservers(0);
+			case CloneMessage.SAVED: 	myInstance.notifyObservers(0);
 									 	break;
 		}
 	}
