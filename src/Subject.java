@@ -174,7 +174,7 @@ public class Subject implements Observable {
 			break;
 
 		case 1:
-			Point [] currentPoints = (Point[]) points.toArray(new Point[numPoints]);
+			Point [] currentPoints = points.toArray(new Point[numPoints]);
 			for (int i = 0; i < getNumPointToRemove(); i++) {
 				int aux;
 				aux = random.nextInt(numPoints);

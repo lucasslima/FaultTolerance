@@ -46,7 +46,7 @@ public class Point implements Serializable, Comparable<Point>{
 	@Override
 	public int compareTo(Point o) {
 
-		Point p = (Point)o;
+		Point p = o;
 	    if(this.x == p.getX() && y == p.getY())
 	    	return 0; 
 	    else
