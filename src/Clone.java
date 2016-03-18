@@ -40,10 +40,12 @@ public class Clone implements Observable {
 		newPoints 			= new ArrayList<Point>();
 		clones				= new Stack<String>();
 		random 				= new Random();
-		masterIp			= "200.239.139.61";
+		masterIp			= "200.239.138.236";
 		whoAmI				= CLONE;
 		cloneIp				= null;
-				
+		
+		//whoAmI = SUBJECT;
+		
 		switch(whoAmI){
 			case SUBJECT: 	serverSocket = new ServerSocket(port);
 							for (int i = 0; i < numPoints; i++) {
@@ -263,6 +265,7 @@ public class Clone implements Observable {
 		threadMaster = new Thread(){
 			@Override
 			public void run(){
+				whoAmI = SUBJECT;
 				startMaster();
 			}
 		};
