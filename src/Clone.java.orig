@@ -55,12 +55,15 @@ public class Clone implements Observable {
 		masterIp			= "200.239.138.236";
 		whoAmI				= CLONE;
 		cloneIp				= null;
+<<<<<<< HEAD
 		checkMasterSocket = new ServerSocket(checkMasterPort);
 		checkMasterSocket.setSoTimeout(3000);
 		
 		checkExistingMasters();
+=======
 		
 		//whoAmI = SUBJECT;
+>>>>>>> bc88958f3fef2c181409adb52314e5e511742e55
 		
 		switch(whoAmI){
 			case SUBJECT: 	serverSocket = new ServerSocket(port);
@@ -141,8 +144,8 @@ public class Clone implements Observable {
 			@Override
 			public void run() {
 				try {
-					udpListen();
 					listen();
+					udpListen();
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -270,7 +273,8 @@ public class Clone implements Observable {
 		}
 	}
 	protected static void udpListen() throws IOException{
-		DatagramSocket dsocket = new DatagramSocket(); 
+		DatagramSocket dsocket = new DatagramSocket();
+		while(true){
 			new Thread(){
 				public void run(){
 					try
@@ -312,6 +316,7 @@ public class Clone implements Observable {
 					}
 				}
 			}.start();
+		}
 	}
 	
 	/**
@@ -497,7 +502,7 @@ public class Clone implements Observable {
 			message.setIP(InetAddress.getLocalHost().getHostAddress());
 			message.setType(CheckMasterMessage.CHECK);
 			
-			InetAddress group = InetAddress.getByName("200.239.139.255");
+			InetAddress group = InetAddress.getByName("200.239.139.0");
 			
 			ByteArrayOutputStream byteStream = new ByteArrayOutputStream(5000);
 			ObjectOutputStream os = new ObjectOutputStream(new BufferedOutputStream(byteStream));
