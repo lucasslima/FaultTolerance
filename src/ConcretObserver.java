@@ -161,6 +161,7 @@ public class ConcretObserver implements Observable, Observer {
 		ports 				= new Stack<Integer>();
 		random 				= new Random();
 		masterIp			= "200.239.139.61";
+		cloneIp 			= null; 			
 				
 		threadObserver = new Thread(){
 			@Override
@@ -404,8 +405,18 @@ public class ConcretObserver implements Observable, Observer {
 			CloneMessage message = (CloneMessage) object;
 			
 			switch(message.getType()){	
-				case CloneMessage.NEW:		points = message.getPoints();
-											observers = message.getObservers();
+				case CloneMessage.REGISTER: if(cloneIp == null){
+												cloneIp = message.getCloneIp();
+												sendMessageToClone(CloneMessage.NEW,cloneIp);
+											}
+											clones.addElement(message.getCloneIp());
+											break;
+			
+				case CloneMessage.SAVED: 	myInstance.notifyObservers(0);
+											break;
+											
+				case CloneMessage.NEW:		points.addAll( message.getPoints() );
+											observers.addAll(message.getObservers() );
 											threadToCheckMaster.start();
 											break;
 			
@@ -414,7 +425,7 @@ public class ConcretObserver implements Observable, Observer {
 											
 				case CloneMessage.SAVE:		timeLastMessage = System.currentTimeMillis();
 											points.clear();
-											points = message.getPoints();
+											points.addAll(message.getPoints() );
 											sendMessageToMaster(CloneMessage.SAVED);
 											break;
 			}

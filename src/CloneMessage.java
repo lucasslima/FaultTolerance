@@ -1,4 +1,5 @@
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.List;
 
 public class CloneMessage implements Serializable{
@@ -21,7 +22,7 @@ public class CloneMessage implements Serializable{
 	}
 
 	public void setObservers(List<String> observers) {
-		this.observers = observers;
+		this.observers = new ArrayList<String>(observers);
 	}
 	
 	public int getClonePort() {

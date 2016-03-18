@@ -40,7 +40,7 @@ public class Clone implements Observable {
 		newPoints 			= new ArrayList<Point>();
 		clones				= new Stack<String>();
 		random 				= new Random();
-		masterIp			= "localhost";
+		masterIp			= "200.239.139.61";
 		whoAmI				= CLONE;
 		cloneIp				= null;
 				
@@ -257,9 +257,9 @@ public class Clone implements Observable {
 	 */
 	private static void startNewMaster() throws InterruptedException{
 		threadClone.interrupt();
-		cloneIp = observers.get(0);
-		clones.addElement(cloneIp);
-		sendMessageToClone(CloneMessage.NEW,null);
+//		cloneIp = observers.get(0);
+//		clones.addElement(cloneIp);
+//		sendMessageToClone(CloneMessage.NEW,null);
 		threadMaster = new Thread(){
 			@Override
 			public void run(){
@@ -283,19 +283,19 @@ public class Clone implements Observable {
 	 */
 	private static void getMessageFromMaster(Object object) throws UnknownHostException, IOException{
 		CloneMessage message = (CloneMessage) object;
-		
+		timeLastMessage = System.currentTimeMillis();
 		switch(message.getType()){	
-			case CloneMessage.NEW:		points = message.getPoints();
-										observers = message.getObservers();
+			case CloneMessage.NEW:		points.addAll(message.getPoints());
+										observers.addAll(message.getObservers() ) ;
 										threadToCheckMaster.start();
 										break;
 										
 			case CloneMessage.ADD: 		observers.add(message.getObserver());
 										break;
 										
-			case CloneMessage.SAVE:		timeLastMessage = System.currentTimeMillis();
+			case CloneMessage.SAVE:		
 										points.clear();
-										points = message.getPoints();
+										points.addAll(message.getPoints());
 										sendMessageToMaster(CloneMessage.SAVED);
 										break;
 		}
@@ -388,6 +388,8 @@ public class Clone implements Observable {
 	private static void sendMessageToClone(int type, String ip){
 		Socket s;
 		try {
+			if (cloneIp == null)
+				throw new IOException();
 			s = new Socket(cloneIp, port);
 			
 			CloneMessage message = new CloneMessage();
