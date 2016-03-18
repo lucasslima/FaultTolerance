@@ -133,13 +133,13 @@ public class ConcretObserver implements Observable, Observer {
 	private static List<Point> 			newPoints;
 	private static List<String> 		observers;
 	private static Stack<String> 		clones;
-	private static Stack<Integer> 		ports;	private static int 					numPoints = 500;
+	private static Stack<Integer> 		ports;	
+	private static int 					numPoints = 500;
 	private static final int 			minimum = 150;
 	private static final int 			maximum = 350;
 	private static ServerSocket 		serverSocket;
 	private static Random 				random;
-	private static int 					portMaster = 6969;
-	private static final int 			portObserver = 6970;
+	private static int 					port = 6969;
 	private static int 					change;
 	private static ConcretObserver		myInstance;
 	private static Thread 				threadToCheckMaster;
@@ -149,22 +149,18 @@ public class ConcretObserver implements Observable, Observer {
 	private static String 				masterIp;
 	private static String 				cloneIp;
 	private static long 				timeLastMessage; 
-	private static boolean				firstCommunication;
 	private static Frame 				frame;
-	private static final int 			OBSERVER = 0;
-	private static int					whoAmI;
+	private static final int 			NEWMASTER = 1;
 	
 	public ConcretObserver() throws IOException{
-		serverSocket 		= new ServerSocket(portObserver);
+		serverSocket 		= new ServerSocket(port);
 		observers 			= new ArrayList<String>();
 		points 				= new ArrayList<Point>();
 		newPoints 			= new ArrayList<Point>();
 		clones				= new Stack<String>();
 		ports 				= new Stack<Integer>();
 		random 				= new Random();
-		masterIp			= "localhost";
-		firstCommunication  = true; 
-		whoAmI				= OBSERVER;
+		masterIp			= "200.239.139.61";
 				
 		threadObserver = new Thread(){
 			@Override
@@ -209,7 +205,7 @@ public class ConcretObserver implements Observable, Observer {
 				while((System.currentTimeMillis() - timeLastMessage) < 700);
 				System.out.println("I am the master now");
 				try {
-					setNewMaster();
+					startNewMaster();
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
@@ -322,6 +318,7 @@ public class ConcretObserver implements Observable, Observer {
 			new Thread() {
 				@Override
 				public void run() {
+					System.out.println("Recebi mensagem do mestre");
 					try {
 						ObjectInputStream in = new ObjectInputStream(s.getInputStream());
 						Object object = in.readObject();
@@ -358,22 +355,7 @@ public class ConcretObserver implements Observable, Observer {
 						if(object instanceof ObserverMessage)
 							getMessageFromObserver(object);
 						else if(object instanceof CloneMessage){
-							CloneMessage message = (CloneMessage) object;
-							if(message.getType() == CloneMessage.NEW && whoAmI == OBSERVER){
-								masterIp = message.getCloneIp();
-								portMaster = message.getClonePort();
-								threadClone = new Thread(){
-									@Override
-									public void run(){
-										observers = message.getObservers();
-										points = message.getPoints();
-										startClone();
-									}
-								};
-								threadClone.start();
-							}
-							else 
-								getMessageFromClone(object);
+							getMessageFromClone(object);
 						}
 						else if(object instanceof SubjectMessage)
 							getMessageFromMaster(object);
@@ -393,12 +375,10 @@ public class ConcretObserver implements Observable, Observer {
 	 * O clone agora assumirá o controle
 	 * @throws InterruptedException 
 	 */
-	private static void setNewMaster() throws InterruptedException{
+	private static void startNewMaster() throws InterruptedException{
 		threadClone.interrupt();
-		cloneIp = null;
 		cloneIp = observers.get(0);
 		clones.addElement(cloneIp);
-		ports.addElement(portObserver);
 		sendMessageToClone(CloneMessage.NEW,null);
 		threadMaster = new Thread(){
 			@Override
@@ -407,7 +387,7 @@ public class ConcretObserver implements Observable, Observer {
 			}
 		};
 		threadMaster.start();
-		myInstance.notifyObservers(1);
+		myInstance.notifyObservers(NEWMASTER);
 	}
 	
 	/**
@@ -426,20 +406,13 @@ public class ConcretObserver implements Observable, Observer {
 			switch(message.getType()){	
 				case CloneMessage.NEW:		points = message.getPoints();
 											observers = message.getObservers();
-											break;
-			
-				case CloneMessage.REGISTER: clones.addElement(message.getCloneIp());
-											ports.addElement(message.getClonePort());
+											threadToCheckMaster.start();
 											break;
 			
 				case CloneMessage.ADD: 		observers.add(message.getObserver());
 											break;
 											
 				case CloneMessage.SAVE:		timeLastMessage = System.currentTimeMillis();
-											if(firstCommunication){
-												firstCommunication = false; 
-												threadToCheckMaster.start();
-											}
 											points.clear();
 											points = message.getPoints();
 											sendMessageToMaster(CloneMessage.SAVED);
@@ -451,7 +424,7 @@ public class ConcretObserver implements Observable, Observer {
 			int type = message.getType();
 			List<Point> newPoints = message.getPoints();
 			
-			if(message.getType() == 2){
+			if(message.getType() == NEWMASTER){
 				masterIp = message.getIp();
 			}
 			else
@@ -487,12 +460,13 @@ public class ConcretObserver implements Observable, Observer {
 	 */
 	private static void getMessageFromClone(Object object){
 		CloneMessage message = (CloneMessage) object;
-		
 		switch(message.getType()){
-		case CloneMessage.REGISTER: cloneIp = message.getCloneIp();
-									clones.addElement(message.getCloneIp());
-									ports.addElement(message.getClonePort());
-									break;
+			case CloneMessage.REGISTER: if(cloneIp == null){
+											cloneIp = message.getCloneIp();
+											sendMessageToClone(CloneMessage.NEW,cloneIp);
+										}
+										clones.addElement(message.getCloneIp());
+										break;
 										
 			case CloneMessage.SAVED: 	myInstance.notifyObservers(0);
 									 	break;
@@ -508,7 +482,7 @@ public class ConcretObserver implements Observable, Observer {
 	private static void sendMessageToMaster(int type) {
 		Socket s;
 		try {
-			s = new Socket(masterIp, portMaster);
+			s = new Socket(masterIp, port);
 			CloneMessage message = new CloneMessage();
 			
 			switch(type){
@@ -516,7 +490,7 @@ public class ConcretObserver implements Observable, Observer {
 										message.setPoints(points);
 										message.setObservers(observers);
 										message.setCloneIp(s.getLocalAddress().getHostAddress());
-										message.setClonePort(portObserver);
+										message.setClonePort(port);
 										break;
 										
 				case CloneMessage.SAVED:	message.setType(CloneMessage.SAVED);
@@ -626,7 +600,7 @@ public class ConcretObserver implements Observable, Observer {
 	public void notifyObservers(int type) {
 		for (String ip : observers) {
 			try {
-				Socket s = new Socket(ip, portObserver);
+				Socket s = new Socket(ip, port);
 				ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
 				
 				SubjectMessage message = new SubjectMessage();
@@ -661,7 +635,7 @@ public class ConcretObserver implements Observable, Observer {
 	 * @throws IOException
 	 */
 	private void notifyObserverJustRegistered(String ip) throws UnknownHostException, IOException{
-		Socket s = new Socket(ip,portObserver);
+		Socket s = new Socket(ip,port);
 		
 		ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
 		SubjectMessage message = new SubjectMessage();
@@ -724,7 +698,7 @@ public class ConcretObserver implements Observable, Observer {
 	 */
 	@Override
 	public void register() throws UnknownHostException, IOException {
-		Socket s = new Socket(masterIp, portMaster);
+		Socket s = new Socket(masterIp, port);
 		
 		ObserverMessage message = new ObserverMessage();
 		message.setIp(s.getLocalAddress().getHostAddress());
@@ -745,7 +719,7 @@ public class ConcretObserver implements Observable, Observer {
 	@SuppressWarnings("resource")
 	@Override
 	public void unregister() throws IOException {
-		Socket s = new Socket(masterIp, portMaster);
+		Socket s = new Socket(masterIp, port);
 
 		ObserverMessage message = new ObserverMessage();
 		message.setIp(s.getLocalAddress().getHostAddress());

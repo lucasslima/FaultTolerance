@@ -14,7 +14,6 @@ public class Subject implements Observable {
 	private static List<Point> 			newPoints;
 	private static List<String> 		observers;
 	private static Stack<String> 		clones;
-	private static Stack<Integer> 		ports;
 	private static int 					numPoints = 500;
 	private static final int 			minimum = 150;
 	private static final int 			maximum = 350;
@@ -22,9 +21,7 @@ public class Subject implements Observable {
 	private static final int 			CLONE = 2;
 	private static ServerSocket 		serverSocket;
 	private static Random 				random;
-	private static final int 			portMaster = 6969;
-	private static final int 			portObserver = 6970;
-	private static int 					portClone = 6971;
+	private static final int 			port = 6969;
 	private static int 					change;
 	private static Subject				myInstance;
 	private static Thread 				threadToCheckMaster;
@@ -33,23 +30,22 @@ public class Subject implements Observable {
 	private static String 				masterIp;
 	private static String 				cloneIp;
 	private static long 				timeLastMessage; 
-	private static boolean				firstCommunication;
 	private static int 					whoAmI; 
+	private static final int 			UPDATE = 0;
+	private static final int 			NEWMASTER = 1;
 	
 	public Subject() throws IOException{
 		observers 			= new ArrayList<String>();
 		points 				= new ArrayList<Point>();
 		newPoints 			= new ArrayList<Point>();
 		clones				= new Stack<String>();
-		ports 				= new Stack<Integer>();
 		random 				= new Random();
 		masterIp			= "localhost";
-		firstCommunication  = true; 
 		whoAmI				= SUBJECT;
 		cloneIp				= null;
 				
 		switch(whoAmI){
-			case SUBJECT: 	serverSocket = new ServerSocket(portMaster);
+			case SUBJECT: 	serverSocket = new ServerSocket(port);
 							for (int i = 0; i < numPoints; i++) {
 								Point point = new Point();
 								int x = random.nextInt(1000);
@@ -69,7 +65,7 @@ public class Subject implements Observable {
 							threadMaster.start();
 							break;
 							
-			case CLONE: 	serverSocket = new ServerSocket(portClone);
+			case CLONE: 	serverSocket = new ServerSocket(port);
 							threadClone = new Thread(){
 								@Override
 								public void run(){
@@ -107,7 +103,7 @@ public class Subject implements Observable {
 				while((System.currentTimeMillis() - timeLastMessage) < 950);
 				System.out.println("I am the master now");
 				try {
-					setNewMaster();
+					startNewMaster();
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
@@ -259,13 +255,10 @@ public class Subject implements Observable {
 	 * O clone agora assumirá o controle
 	 * @throws InterruptedException 
 	 */
-	private static void setNewMaster() throws InterruptedException{
+	private static void startNewMaster() throws InterruptedException{
 		threadClone.interrupt();
-		cloneIp = null;
 		cloneIp = observers.get(0);
-		portClone = portObserver;
 		clones.addElement(cloneIp);
-		ports.addElement(portObserver);
 		sendMessageToClone(CloneMessage.NEW,null);
 		threadMaster = new Thread(){
 			@Override
@@ -274,7 +267,7 @@ public class Subject implements Observable {
 			}
 		};
 		threadMaster.start();
-		myInstance.notifyObservers(1);
+		myInstance.notifyObservers(NEWMASTER);
 		
 		
 	}
@@ -294,22 +287,13 @@ public class Subject implements Observable {
 		switch(message.getType()){	
 			case CloneMessage.NEW:		points = message.getPoints();
 										observers = message.getObservers();
+										threadToCheckMaster.start();
 										break;
-										
-			case CloneMessage.REGISTER: 	cloneIp = message.getCloneIp();
-											portClone = message.getClonePort();
-											clones.addElement(message.getCloneIp());
-											ports.addElement(message.getClonePort());
-											break;
 										
 			case CloneMessage.ADD: 		observers.add(message.getObserver());
 										break;
 										
 			case CloneMessage.SAVE:		timeLastMessage = System.currentTimeMillis();
-										if(firstCommunication){
-											firstCommunication = false; 
-											threadToCheckMaster.start();
-										}
 										points.clear();
 										points = message.getPoints();
 										sendMessageToMaster(CloneMessage.SAVED);
@@ -329,7 +313,8 @@ public class Subject implements Observable {
 	private static void getMessageFromObserver(Object object) throws UnknownHostException, IOException{
 		ObserverMessage message = (ObserverMessage) object;
 		switch (message.getType()) {
-			case 0:	myInstance.registerObserver(message.getIp());
+			case 0:	System.out.println("Cadastrando novo observer de ip: " + message.getIp());
+					myInstance.registerObserver(message.getIp());
 					break;
 			case 1:	myInstance.unregisterObserver(message.getIp());
 					break;
@@ -347,13 +332,14 @@ public class Subject implements Observable {
 		CloneMessage message = (CloneMessage) object;
 		
 		switch(message.getType()){
-			case CloneMessage.REGISTER: cloneIp = message.getCloneIp();
-										portClone = message.getClonePort();
+			case CloneMessage.REGISTER: if(cloneIp == null){
+											cloneIp = message.getCloneIp();
+											sendMessageToClone(CloneMessage.NEW,cloneIp);
+										}
 										clones.addElement(message.getCloneIp());
-										ports.addElement(message.getClonePort());
 										break;
 										
-			case CloneMessage.SAVED: 	myInstance.notifyObservers(0);
+			case CloneMessage.SAVED: 	myInstance.notifyObservers(UPDATE);
 									 	break;
 		}
 	}
@@ -367,16 +353,15 @@ public class Subject implements Observable {
 	private static void sendMessageToMaster(int type) {
 		Socket s;
 		try {
-			s = new Socket(masterIp, portMaster);
+			s = new Socket(masterIp, port);
 			CloneMessage message = new CloneMessage();
 			
 			switch(type){
-			case CloneMessage.REGISTER: message.setType(CloneMessage.REGISTER);
-										message.setPoints(points);
-										message.setObservers(observers);
-										message.setCloneIp(s.getLocalAddress().getHostAddress());
-										message.setClonePort(portClone);
-										break;
+				case CloneMessage.REGISTER: message.setType(CloneMessage.REGISTER);
+											message.setPoints(points);
+											message.setObservers(observers);
+											message.setCloneIp(s.getLocalAddress().getHostAddress());
+											break;
 										
 				case CloneMessage.SAVED:	message.setType(CloneMessage.SAVED);
 											break;
@@ -404,7 +389,7 @@ public class Subject implements Observable {
 	private static void sendMessageToClone(int type, String ip){
 		Socket s;
 		try {
-			s = new Socket(cloneIp, portClone);
+			s = new Socket(cloneIp, port);
 			
 			CloneMessage message = new CloneMessage();
 
@@ -431,7 +416,7 @@ public class Subject implements Observable {
 			s.close();	
 		} catch (IOException e) {
 			System.out.println("No connection");
-			myInstance.notifyObservers(0);
+			myInstance.notifyObservers(UPDATE);
 			if(cloneIp != null || clones.size() != 0)
 				updateClones();
 		}
@@ -443,11 +428,9 @@ public class Subject implements Observable {
 		else{
 			if(clones.size() >= 1){
 				cloneIp = clones.pop();
-				portClone = ports.pop();
 			} else {
 				int index = 0;
 				cloneIp = observers.get(index);
-				portClone = portObserver;
 				sendMessageToClone(CloneMessage.NEW, null);
 			}
 		}
@@ -486,19 +469,20 @@ public class Subject implements Observable {
 	@Override
 	public void notifyObservers(int type) {
 		for (String ip : observers) {
+			System.out.println("Sending message to: " + ip);
 			try {
-				Socket s = new Socket(ip, portObserver);
+				Socket s = new Socket(ip, port);
 				ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
 				
 				SubjectMessage message = new SubjectMessage();
 				
 				switch(type){
-					case 0:	message.setPoints(newPoints);
-							message.setType(change);
-							break;
-					case 1: message.setIp(serverSocket.getInetAddress().getHostAddress());
-							message.setType(2);
-							break;
+					case UPDATE:	message.setPoints(newPoints);
+									message.setType(change);
+									break;
+					case NEWMASTER: message.setIp(serverSocket.getInetAddress().getHostAddress());
+									message.setType(NEWMASTER);
+									break;
 				}
 				
 				out.writeObject(message);
@@ -522,7 +506,7 @@ public class Subject implements Observable {
 	 * @throws IOException
 	 */
 	private void notifyObserverJustRegistered(String ip) throws UnknownHostException, IOException{
-		Socket s = new Socket(ip,portObserver);
+		Socket s = new Socket(ip,port);
 		
 		ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
 		SubjectMessage message = new SubjectMessage();
