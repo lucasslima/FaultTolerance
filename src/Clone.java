@@ -270,45 +270,48 @@ public class Clone implements Observable {
 		}
 	}
 	protected static void udpListen() throws IOException{
-		DatagramSocket dsocket = new DatagramSocket(); 
+			DatagramSocket dsocket = new DatagramSocket(checkMasterPort);
 			new Thread(){
 				public void run(){
-					try
-				    {
-				      byte[] recvBuf = new byte[5000];
-				      DatagramPacket receivepacket = new DatagramPacket(recvBuf,
-				                                                 recvBuf.length);
-				      dsocket.receive(receivepacket);
-				      int byteCount = receivepacket.getLength();
-				      ByteArrayInputStream receivebyteStream = new
-				                                  ByteArrayInputStream(recvBuf);
-				      ObjectInputStream is = new
-				           ObjectInputStream(new BufferedInputStream(receivebyteStream));
-				      CheckMasterMessage o = (CheckMasterMessage) is.readObject();
-				      is.close();
-				      if (o.getType() == CheckMasterMessage.CHECK){
-				    	  Socket s = new Socket(o.getIP(), checkMasterPort);
-							
-							CheckMasterMessage message = new CheckMasterMessage();
-							message.setIP(InetAddress.getLocalHost().getHostAddress());
-							message.setType(CheckMasterMessage.SUBJECT);
-							
-							ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
-							out.writeObject(message);
-							out.flush();
-							out.close();
-							
-							s.close();
-				      }
-				    }
-				    catch (IOException e)
-				    {
-				      System.err.println("Exception:  " + e);
-				      e.printStackTrace();
-				    }
-					catch (ClassNotFoundException e){
-						System.err.println("Exception:  " + e);
-						e.printStackTrace();
+					while (true){
+						try
+						{
+							byte[] recvBuf = new byte[5000];
+							DatagramPacket receivepacket = new DatagramPacket(recvBuf,
+						                                                 recvBuf.length);
+							dsocket.receive(receivepacket);
+							System.out.println("Package recieved");
+							int byteCount = receivepacket.getLength();
+							ByteArrayInputStream receivebyteStream = new ByteArrayInputStream(recvBuf);
+						      ObjectInputStream is = new
+						           ObjectInputStream(new BufferedInputStream(receivebyteStream));
+						      CheckMasterMessage o = (CheckMasterMessage) is.readObject();
+						      is.close();
+						      if (o.getType() == CheckMasterMessage.CHECK){
+						    	  Socket s = new Socket(o.getIP(), checkMasterPort);
+									
+									CheckMasterMessage message = new CheckMasterMessage();
+									message.setIP(InetAddress.getLocalHost().getHostAddress());
+									message.setType(CheckMasterMessage.SUBJECT);
+									
+									ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
+									out.writeObject(message);
+									out.flush();
+									out.close();
+									
+									s.close();
+						      }
+						      dsocket.close();
+						    }
+						    catch (IOException e)
+						    {
+						      System.err.println("Exception:  " + e);
+						      e.printStackTrace();
+						    }
+							catch (ClassNotFoundException e){
+								System.err.println("Exception:  " + e);
+								e.printStackTrace();
+							}
 					}
 				}
 			}.start();
@@ -491,7 +494,8 @@ public class Clone implements Observable {
 	private static void checkExistingMasters(){
 		Socket s;
 		try {
-			DatagramSocket dSock = new DatagramSocket();
+			DatagramSocket dSock = new DatagramSocket(checkMasterPort,InetAddress.getByName("200.239.139.255") );
+			dSock.setBroadcast(true);
 			
 			CheckMasterMessage message = new CheckMasterMessage();
 			message.setIP(InetAddress.getLocalHost().getHostAddress());
@@ -506,7 +510,7 @@ public class Clone implements Observable {
 			os.flush();
 			byte[] sendBuffer = byteStream.toByteArray();
 			
-			DatagramPacket packet = new DatagramPacket(sendBuffer, sendBuffer.length,group,port);
+			DatagramPacket packet = new DatagramPacket(sendBuffer, sendBuffer.length,dSock.getLocalAddress(),checkMasterPort);
 			
 			dSock.send(packet);
 		    os.close();
@@ -522,6 +526,7 @@ public class Clone implements Observable {
 			} catch (Exception e){
 				e.printStackTrace();
 			}
+		    dSock.close();
 		    
 		} catch (IOException e) {
 			e.printStackTrace();
