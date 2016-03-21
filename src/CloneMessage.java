@@ -7,9 +7,10 @@ public class CloneMessage implements Serializable{
 	public static final int 	SAVED = 0;
 	public static final int 	CONFIRMATION = 1; 
 	public static final int 	ADD = 2;
-	public static final int 	SAVE = 3; 
-	public static final int 	REGISTER = 4; 
-	public static final int 	NEW = 5; 
+	public static final int 	SAVE_NEW_POINTS = 3; 
+	public static final int 	SAVE_REMOVED_POINTS = 4; 
+	public static final int 	REGISTER = 5; 
+	public static final int 	NEW = 6; 
 	private int 				type; 
 	private List<Point> 		points;
 	private String 				observer; 

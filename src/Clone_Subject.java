@@ -8,11 +8,14 @@ import java.io.ObjectOutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Random;
 import java.util.Stack;
@@ -26,14 +29,14 @@ public class Clone_Subject implements Observable {
 	private static final int 			minimum = 150;
 	private static final int 			maximum = 350;
 	private static final int 			SUBJECT = 0;
-	private static final int 			CLONE = 2;
+	private static final int 			CLONE = 1;
 	private static ServerSocket 		serverSocket;
 	private static ServerSocket 		checkMasterSocket;
 	private static Random 				random;
 	private static final int 			port = 6969;
 	private static final int 			checkMasterPort = 6970;
 	private static int 					change;
-	private static Clone_Subject				myInstance;
+	private static Clone_Subject		myInstance;
 	private static Thread 				threadToCheckMaster;
 	private static Thread 				threadToCheckClone;
 	private static Thread 				threadMaster;
@@ -45,6 +48,7 @@ public class Clone_Subject implements Observable {
 	private static int 					whoAmI; 
 	private static final int 			UPDATE = 0;
 	private static final int 			NEWMASTER = 1;
+	private static final String 		broadCastAddress = "192.168.43.255";
 	
 	public Clone_Subject() throws IOException{
 		observers 			= new ArrayList<String>();
@@ -58,7 +62,8 @@ public class Clone_Subject implements Observable {
 		checkMasterSocket.setSoTimeout(3000);
 		
 		checkExistingMasters();
-				
+		
+						
 		switch(whoAmI){
 			case SUBJECT: 	serverSocket = new ServerSocket(port);
 							for (int i = 0; i < numPoints; i++) {
@@ -82,7 +87,6 @@ public class Clone_Subject implements Observable {
 							break;
 							
 			case CLONE: 	serverSocket = new ServerSocket(port);
-			
 							threadClone = new Thread(){
 								@Override
 								public void run(){
@@ -157,7 +161,6 @@ public class Clone_Subject implements Observable {
 						int seg = random.nextInt(600);
 						Thread.sleep(seg);
 						changePoints();
-						sendMessageToClone(CloneMessage.SAVE,null);
 					}
 
 				} catch (InterruptedException e) {					
@@ -189,32 +192,38 @@ public class Clone_Subject implements Observable {
 	protected static void changePoints() {
 		change = random.nextInt(2);
 		switch (change) {
-		case 0:
-			for (int i = 0; i < getNumPointToChange(); i++) {
-				Point point = new Point();
-				int x = random.nextInt(1000);
-				int y = random.nextInt(1000);
-				int cor = random.nextInt(5);
-				point.setX(x);
-				point.setY(y);
-				point.setCor(cor);
-				newPoints.add(point);
-
-			}
-			points.addAll(newPoints);
-			numPoints = points.size();
-			break;
-
-		case 1:
-			Point [] currentPoints = (Point[]) points.toArray(new Point[numPoints]);
-			for (int i = 0; i < getNumPointToRemove(); i++) {
-				int aux;
-				aux = random.nextInt(numPoints);
-				newPoints.add(currentPoints[aux]);
-			}
-			points.removeAll(newPoints);
-			numPoints = points.size();
-			break;
+			case 0:
+				for (int i = 0; i < getNumPointToChange(); i++) {
+					Point point = new Point();
+					int x = random.nextInt(1000);
+					int y = random.nextInt(1000);
+					int cor = random.nextInt(5);
+					point.setX(x);
+					point.setY(y);
+					point.setCor(cor);
+					newPoints.add(point);
+	
+				}
+				points.addAll(newPoints);
+				numPoints = points.size();
+				
+				sendMessageToClone(CloneMessage.SAVE_NEW_POINTS,null);
+				
+				break;
+	
+			case 1:
+				Point [] currentPoints = (Point[]) points.toArray(new Point[numPoints]);
+				for (int i = 0; i < getNumPointToRemove(); i++) {
+					int aux;
+					aux = random.nextInt(numPoints);
+					newPoints.add(currentPoints[aux]);
+				}
+				points.removeAll(newPoints);
+				numPoints = points.size();
+				
+				sendMessageToClone(CloneMessage.SAVE_REMOVED_POINTS,null);
+				
+				break;
 		}
 	}
 
@@ -337,9 +346,6 @@ public class Clone_Subject implements Observable {
 	 */
 	private static void startNewMaster() throws InterruptedException{
 		threadClone.interrupt();
-//		cloneIp = observers.get(0);
-//		clones.addElement(cloneIp);
-//		sendMessageToClone(CloneMessage.NEW,null);
 		threadMaster = new Thread(){
 			@Override
 			public void run(){
@@ -376,10 +382,14 @@ public class Clone_Subject implements Observable {
 			case CloneMessage.ADD: 		observers.add(message.getObserver());
 										break;
 										
-			case CloneMessage.SAVE:		
-										points.clear();
+			case CloneMessage.SAVE_NEW_POINTS:		
 										points.addAll(message.getPoints());
 										sendMessageToMaster(CloneMessage.SAVED);
+										break;
+										
+			case CloneMessage.SAVE_REMOVED_POINTS:
+										for(Point point : newPoints)
+											points.remove(point.getIndex());
 										break;
 		}
 	}
@@ -490,8 +500,13 @@ public class Clone_Subject implements Observable {
 											message.setObserver(ip);
 											break;
 											
-				case CloneMessage.SAVE: 	message.setType(CloneMessage.SAVE);
-											message.setPoints(points);
+				case CloneMessage.SAVE_NEW_POINTS: 	
+											message.setType(CloneMessage.SAVE_NEW_POINTS);
+											message.setPoints(newPoints);
+											break;
+				case CloneMessage.SAVE_REMOVED_POINTS: 	
+											message.setType(CloneMessage.SAVE_NEW_POINTS);
+											message.setPoints(newPoints);
 											break;
 			}
 			
@@ -502,7 +517,7 @@ public class Clone_Subject implements Observable {
 			
 			s.close();	
 		} catch (IOException e) {
-			System.out.println("No connection");
+			System.out.println("No connection with clone");
 			myInstance.notifyObservers(UPDATE);
 			if(cloneIp != null || clones.size() != 0){
 				clones.remove(cloneIp);
@@ -520,22 +535,46 @@ public class Clone_Subject implements Observable {
 	private static void checkExistingMasters(){
 		Socket s;
 		try {
-			DatagramSocket dSock = new DatagramSocket(checkMasterPort,InetAddress.getByName("200.239.139.255") );
+			String result = null;
+			Enumeration<NetworkInterface> interfaces = null;
+			try {
+			    interfaces = NetworkInterface.getNetworkInterfaces();
+			} catch (SocketException e) {
+			}
+			 
+			if (interfaces != null) {
+			    while (interfaces.hasMoreElements() && result == null) {
+			        NetworkInterface i = interfaces.nextElement();
+			        Enumeration<InetAddress> addresses = i.getInetAddresses();
+			        while (addresses.hasMoreElements() && (result == null || result.isEmpty())) {
+			            InetAddress address = addresses.nextElement();
+			            if (!address.isLoopbackAddress()  &&
+			                    address.isSiteLocalAddress()) {
+			                result = address.getHostAddress();
+			            }
+			        }
+			    }
+			}
+									
+			DatagramSocket dSock = new DatagramSocket(checkMasterPort,InetAddress.getByName(result));
 			dSock.setBroadcast(true);
+			
 			
 			CheckMasterMessage message = new CheckMasterMessage();
 			message.setIP(InetAddress.getLocalHost().getHostAddress());
 			message.setType(CheckMasterMessage.CHECK);
 			
-			InetAddress group = InetAddress.getByName("200.239.139.255");
+			InetAddress group = InetAddress.getByName(broadCastAddress);
 			
 			ByteArrayOutputStream byteStream = new ByteArrayOutputStream(5000);
+			
 			ObjectOutputStream os = new ObjectOutputStream(new BufferedOutputStream(byteStream));
 			os.flush();
 			os.writeObject(message);
 			os.flush();
-			byte[] sendBuffer = byteStream.toByteArray();
 			
+			byte[] sendBuffer = byteStream.toByteArray();
+						
 			DatagramPacket packet = new DatagramPacket(sendBuffer, sendBuffer.length,dSock.getLocalAddress(),checkMasterPort);
 			
 			dSock.send(packet);
@@ -546,12 +585,14 @@ public class Clone_Subject implements Observable {
 				CheckMasterMessage response = (CheckMasterMessage) in.readObject();
 				masterIp = response.getIP();
 				whoAmI = CLONE;
+				s.close();
 		    	
 		    }  catch (SocketTimeoutException e){
 		    	whoAmI = SUBJECT;
 			} catch (Exception e){
 				e.printStackTrace();
 			}
+		    
 		    dSock.close();
 		    
 		} catch (IOException e) {

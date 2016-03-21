@@ -21,7 +21,6 @@ public class ConcretObserver implements Observer {
 	private static int 					port = 6969;
 	private static final int 			checkMasterPort = 6970;
 	private static ConcretObserver		myInstance;
-	private static Thread 				threadObserver;
 	private static String 				masterIp;
 	private static Frame 				frame;
 	
@@ -32,7 +31,7 @@ public class ConcretObserver implements Observer {
 		checkMasterSocket 	= new ServerSocket(checkMasterPort);
 		checkMasterSocket.setSoTimeout(3000);
 				
-		threadObserver = new Thread(){
+		new Thread(){
 			@Override
 			public void run(){
 				try {
@@ -43,8 +42,7 @@ public class ConcretObserver implements Observer {
 					e.printStackTrace();
 				}
 			}
-		};
-		threadObserver.start();
+		}.start();
 	}
 
 	public static void main(String[] args) throws IOException {
@@ -66,6 +64,7 @@ public class ConcretObserver implements Observer {
 				}
 			}
 		}.start();
+		
 		myInstance.register();
 	}
 	
