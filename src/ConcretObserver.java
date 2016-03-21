@@ -6,11 +6,14 @@ import java.io.ObjectOutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Enumeration;
 import java.util.List;
 
 
@@ -23,6 +26,7 @@ public class ConcretObserver implements Observer {
 	private static ConcretObserver		myInstance;
 	private static String 				masterIp;
 	private static Frame 				frame;
+	private static final String 		broadCastAddress = "192.168.43.255";
 	
 	public ConcretObserver() throws IOException{
 		serverSocket 		= new ServerSocket(port);
@@ -167,22 +171,46 @@ public class ConcretObserver implements Observer {
 	private static void checkExistingMasters(){
 		Socket s;
 		try {
-			DatagramSocket dSock = new DatagramSocket(checkMasterPort,InetAddress.getByName("200.239.139.255") );
+			String result = null;
+			Enumeration<NetworkInterface> interfaces = null;
+			try {
+			    interfaces = NetworkInterface.getNetworkInterfaces();
+			} catch (SocketException e) {
+			}
+			 
+			if (interfaces != null) {
+			    while (interfaces.hasMoreElements() && result == null) {
+			        NetworkInterface i = interfaces.nextElement();
+			        Enumeration<InetAddress> addresses = i.getInetAddresses();
+			        while (addresses.hasMoreElements() && (result == null || result.isEmpty())) {
+			            InetAddress address = addresses.nextElement();
+			            if (!address.isLoopbackAddress()  &&
+			                    address.isSiteLocalAddress()) {
+			                result = address.getHostAddress();
+			            }
+			        }
+			    }
+			}
+									
+			DatagramSocket dSock = new DatagramSocket(checkMasterPort,InetAddress.getByName(result));
 			dSock.setBroadcast(true);
+			
 			
 			CheckMasterMessage message = new CheckMasterMessage();
 			message.setIP(InetAddress.getLocalHost().getHostAddress());
 			message.setType(CheckMasterMessage.CHECK);
 			
-			InetAddress group = InetAddress.getByName("200.239.139.255");
+			InetAddress group = InetAddress.getByName(broadCastAddress);
 			
 			ByteArrayOutputStream byteStream = new ByteArrayOutputStream(5000);
+			
 			ObjectOutputStream os = new ObjectOutputStream(new BufferedOutputStream(byteStream));
 			os.flush();
 			os.writeObject(message);
 			os.flush();
-			byte[] sendBuffer = byteStream.toByteArray();
 			
+			byte[] sendBuffer = byteStream.toByteArray();
+						
 			DatagramPacket packet = new DatagramPacket(sendBuffer, sendBuffer.length,dSock.getLocalAddress(),checkMasterPort);
 			
 			dSock.send(packet);
@@ -192,11 +220,13 @@ public class ConcretObserver implements Observer {
 		    	ObjectInputStream in = new ObjectInputStream(s.getInputStream());
 				CheckMasterMessage response = (CheckMasterMessage) in.readObject();
 				masterIp = response.getIP();
+				s.close();
+		    	
 		    }  catch (SocketTimeoutException e){
-		    	System.out.println("No master has been found!");
 			} catch (Exception e){
 				e.printStackTrace();
 			}
+		    
 		    dSock.close();
 		    
 		} catch (IOException e) {

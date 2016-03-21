@@ -62,8 +62,7 @@ public class Clone_Subject implements Observable {
 		checkMasterSocket.setSoTimeout(3000);
 		
 		checkExistingMasters();
-		
-						
+								
 		switch(whoAmI){
 			case SUBJECT: 	serverSocket = new ServerSocket(port);
 							for (int i = 0; i < numPoints; i++) {
@@ -534,6 +533,7 @@ public class Clone_Subject implements Observable {
 	@SuppressWarnings("unused")
 	private static void checkExistingMasters(){
 		Socket s;
+		DatagramSocket dSock = null;
 		try {
 			String result = null;
 			Enumeration<NetworkInterface> interfaces = null;
@@ -556,7 +556,7 @@ public class Clone_Subject implements Observable {
 			    }
 			}
 									
-			DatagramSocket dSock = new DatagramSocket(checkMasterPort,InetAddress.getByName(result));
+			dSock = new DatagramSocket(checkMasterPort,InetAddress.getByName(result));
 			dSock.setBroadcast(true);
 			
 			
@@ -596,6 +596,7 @@ public class Clone_Subject implements Observable {
 		    dSock.close();
 		    
 		} catch (IOException e) {
+			dSock.close();
 			e.printStackTrace();
 		}
 	}
