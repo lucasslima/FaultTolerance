@@ -561,7 +561,7 @@ public class Clone_Subject implements Observable {
 			
 			
 			CheckMasterMessage message = new CheckMasterMessage();
-			message.setIP(InetAddress.getLocalHost().getHostAddress());
+			message.setIP(result);
 			message.setType(CheckMasterMessage.CHECK);
 			
 			InetAddress group = InetAddress.getByName(broadCastAddress);
