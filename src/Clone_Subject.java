@@ -7,7 +7,6 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
-import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -17,9 +16,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.Stack;
-import java.util.concurrent.TimeoutException;
 
-public class Clone implements Observable {
+public class Clone_Subject implements Observable {
 	private static List<Point> 			points;
 	private static List<Point> 			newPoints;
 	private static List<String> 		observers;
@@ -35,33 +33,32 @@ public class Clone implements Observable {
 	private static final int 			port = 6969;
 	private static final int 			checkMasterPort = 6970;
 	private static int 					change;
-	private static Clone				myInstance;
+	private static Clone_Subject				myInstance;
 	private static Thread 				threadToCheckMaster;
+	private static Thread 				threadToCheckClone;
 	private static Thread 				threadMaster;
 	private static Thread 				threadClone;
 	private static String 				masterIp;
 	private static String 				cloneIp;
-	private static long 				timeLastMessage; 
+	private static long 				timeLastMessageFromMaster; 
+	private static long 				timeLastMessageFromClone; 
 	private static int 					whoAmI; 
 	private static final int 			UPDATE = 0;
 	private static final int 			NEWMASTER = 1;
 	
-	public Clone() throws IOException{
+	public Clone_Subject() throws IOException{
 		observers 			= new ArrayList<String>();
 		points 				= new ArrayList<Point>();
 		newPoints 			= new ArrayList<Point>();
 		clones				= new Stack<String>();
 		random 				= new Random();
-		masterIp			= "200.239.138.236";
-		whoAmI				= CLONE;
+		masterIp			= null;
 		cloneIp				= null;
-		checkMasterSocket = new ServerSocket(checkMasterPort);
+		checkMasterSocket 	= new ServerSocket(checkMasterPort);
 		checkMasterSocket.setSoTimeout(3000);
 		
 		checkExistingMasters();
-		
-		//whoAmI = SUBJECT;
-		
+				
 		switch(whoAmI){
 			case SUBJECT: 	serverSocket = new ServerSocket(port);
 							for (int i = 0; i < numPoints; i++) {
@@ -74,6 +71,7 @@ public class Clone implements Observable {
 								point.setCor(cor);
 								points.add(point);
 							}
+							
 							threadMaster = new Thread(){
 								@Override
 								public void run(){
@@ -84,6 +82,7 @@ public class Clone implements Observable {
 							break;
 							
 			case CLONE: 	serverSocket = new ServerSocket(port);
+			
 							threadClone = new Thread(){
 								@Override
 								public void run(){
@@ -96,7 +95,7 @@ public class Clone implements Observable {
 	}
 
 	public static void main(String[] args) throws IOException {
-		myInstance = new Clone();
+		myInstance = new Clone_Subject();
 	}
 
 	/**
@@ -118,7 +117,7 @@ public class Clone implements Observable {
 		threadToCheckMaster = new Thread(){
 			@Override
 			public void run(){
-				while((System.currentTimeMillis() - timeLastMessage) < 950);
+				while((System.currentTimeMillis() - timeLastMessageFromMaster) < 950);
 				System.out.println("I am the master now");
 				try {
 					startNewMaster();
@@ -166,6 +165,20 @@ public class Clone implements Observable {
 				}
 			}
 		}.start();
+		
+		threadToCheckClone = new Thread(){
+			@Override
+			public void run(){
+				while((System.currentTimeMillis() - timeLastMessageFromClone) < 500);
+				try {
+					cloneIp = null;
+					myInstance.notifyObservers(UPDATE);
+					threadToCheckClone.wait();
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+		};
 	}
 	
 	/**
@@ -269,6 +282,7 @@ public class Clone implements Observable {
 			
 		}
 	}
+	
 	protected static void udpListen() throws IOException{
 			DatagramSocket dsocket = new DatagramSocket(checkMasterPort);
 			new Thread(){
@@ -281,7 +295,6 @@ public class Clone implements Observable {
 						                                                 recvBuf.length);
 							dsocket.receive(receivepacket);
 							System.out.println("Package recieved");
-							int byteCount = receivepacket.getLength();
 							ByteArrayInputStream receivebyteStream = new ByteArrayInputStream(recvBuf);
 						      ObjectInputStream is = new
 						           ObjectInputStream(new BufferedInputStream(receivebyteStream));
@@ -351,7 +364,9 @@ public class Clone implements Observable {
 	 */
 	private static void getMessageFromMaster(Object object) throws UnknownHostException, IOException{
 		CloneMessage message = (CloneMessage) object;
-		timeLastMessage = System.currentTimeMillis();
+		
+		timeLastMessageFromMaster = System.currentTimeMillis();
+		
 		switch(message.getType()){	
 			case CloneMessage.NEW:		points.addAll(message.getPoints());
 										observers.addAll(message.getObservers() ) ;
@@ -398,8 +413,11 @@ public class Clone implements Observable {
 	private static void getMessageFromClone(Object object){
 		CloneMessage message = (CloneMessage) object;
 		
+		timeLastMessageFromClone = System.currentTimeMillis();
+		
 		switch(message.getType()){
 			case CloneMessage.REGISTER: if(cloneIp == null){
+											threadToCheckClone.start();
 											cloneIp = message.getCloneIp();
 											sendMessageToClone(CloneMessage.NEW,cloneIp);
 										}
@@ -486,11 +504,19 @@ public class Clone implements Observable {
 		} catch (IOException e) {
 			System.out.println("No connection");
 			myInstance.notifyObservers(UPDATE);
-			if(cloneIp != null || clones.size() != 0)
-				updateClones();
+			if(cloneIp != null || clones.size() != 0){
+				clones.remove(cloneIp);
+				if(clones.size() >= 1){
+					cloneIp = clones.get(0);
+					threadToCheckClone.notify();
+				}
+				else 
+					cloneIp = null;
+			}
 		}
 	}
 	
+	@SuppressWarnings("unused")
 	private static void checkExistingMasters(){
 		Socket s;
 		try {
@@ -533,19 +559,7 @@ public class Clone implements Observable {
 		}
 	}
 	
-	private static void updateClones(){
-		if(clones.contains(cloneIp))
-			clones.remove(cloneIp);
-		else{
-			if(clones.size() >= 1){
-				cloneIp = clones.pop();
-			} else {
-				int index = 0;
-				cloneIp = observers.get(index);
-				sendMessageToClone(CloneMessage.NEW, null);
-			}
-		}
-	}
+	
 	
 	/**
 	 * USADA SOMENTE PELO MASTER
