@@ -13,6 +13,7 @@ import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 import java.util.Stack;
@@ -21,7 +22,6 @@ public class Clone_Subject implements Observable {
 	private static List<Point> 			points;
 	private static List<Point> 			newPoints;
 	private static List<String> 		observers;
-	private static Stack<String> 		clones;
 	private static int 					numPoints = 500;
 	private static final int 			minimum = 150;
 	private static final int 			maximum = 350;
@@ -35,22 +35,19 @@ public class Clone_Subject implements Observable {
 	private static int 					change;
 	private static Clone_Subject		myInstance;
 	private static Thread 				threadToCheckMaster;
-	private static Thread 				threadToCheckClone;
 	private static Thread 				threadMaster;
 	private static Thread 				threadClone;
 	private static String 				masterIp;
 	private static String 				cloneIp;
 	private static long 				timeLastMessageMaster; 
-	private static long 				timeLastMessageClone; 
 	private static int 					whoAmI; 
 	private static final int 			UPDATE = 0;
 	private static final int 			NEWMASTER = 1;
 	
 	public Clone_Subject() throws IOException{
-		observers 			= new ArrayList<String>();
+		observers 			= Collections.synchronizedList(new ArrayList<String>());
 		points 				= new ArrayList<Point>();
 		newPoints 			= new ArrayList<Point>();
-		clones				= new Stack<String>();
 		random 				= new Random();
 		masterIp			= null;
 		cloneIp				= null;
@@ -164,17 +161,6 @@ public class Clone_Subject implements Observable {
 				}
 			}
 		}.start();
-		
-		threadToCheckClone = new Thread(){
-			@Override
-			public void run(){
-				while((System.currentTimeMillis() - timeLastMessageClone) < 500);
-				System.out.println("Clone is down");
-				cloneIp = null;
-				myInstance.notifyObservers(UPDATE);
-				
-			}
-		};
 
 	}
 	
@@ -345,7 +331,8 @@ public class Clone_Subject implements Observable {
 			}
 		};
 		threadMaster.start();
-		myInstance.notifyObservers(NEWMASTER);
+		if(observers.size() != 0)
+			myInstance.notifyObservers(NEWMASTER);
 		
 		
 	}
@@ -366,11 +353,16 @@ public class Clone_Subject implements Observable {
 		
 		switch(message.getType()){	
 			case CloneMessage.NEW:		points.addAll(message.getPoints());
-										observers.addAll(message.getObservers() ) ;
+										synchronized (observers) {
+											observers.addAll(message.getObservers() ) ;
+										}
 										threadToCheckMaster.start();
 										break;
 										
-			case CloneMessage.ADD: 		observers.add(message.getObserver());
+			case CloneMessage.ADD: 		
+										synchronized (observers) {
+											observers.add(message.getObserver());
+										}
 										break;
 										
 			case CloneMessage.SAVE:		
@@ -409,19 +401,16 @@ public class Clone_Subject implements Observable {
 	 */
 	private static void getMessageFromClone(Object object){
 		CloneMessage message = (CloneMessage) object;
-		
-		timeLastMessageClone = System.currentTimeMillis();
-		
+				
 		switch(message.getType()){
 			case CloneMessage.REGISTER: if(cloneIp == null){
-											threadToCheckClone.start();
 											cloneIp = message.getCloneIp();
 											sendMessageToClone(CloneMessage.NEW,cloneIp);
 										}
-										clones.addElement(message.getCloneIp());
 										break;
 										
-			case CloneMessage.SAVED: 	myInstance.notifyObservers(UPDATE);
+			case CloneMessage.SAVED: 	if(observers.size() != 0)
+											myInstance.notifyObservers(UPDATE);
 									 	break;
 		}
 	}
@@ -500,9 +489,8 @@ public class Clone_Subject implements Observable {
 			s.close();	
 		} catch (IOException e) {
 			System.out.println("No connection");
-			myInstance.notifyObservers(UPDATE);
-			if(cloneIp != null || clones.size() != 0)
-				updateClones();
+			if(observers.size() != 0)
+				myInstance.notifyObservers(UPDATE);
 		}
 	}
 	
@@ -549,20 +537,6 @@ public class Clone_Subject implements Observable {
 		}
 	}
 	
-	private static void updateClones(){
-		if(clones.contains(cloneIp))
-			clones.remove(cloneIp);
-		else{
-			if(clones.size() >= 1){
-				cloneIp = clones.pop();
-			} else {
-				int index = 0;
-				cloneIp = observers.get(index);
-				sendMessageToClone(CloneMessage.NEW, null);
-			}
-		}
-	}
-	
 	/**
 	 * USADA SOMENTE PELO MASTER
 	 * Essa função insere um novo observer na lista 
@@ -572,7 +546,9 @@ public class Clone_Subject implements Observable {
 	 */
 	@Override
 	public void registerObserver(String ip) throws UnknownHostException, IOException {
-		observers.add(ip);
+		synchronized (observers) {
+			observers.add(ip);
+		}
 		notifyObserverJustRegistered(ip);
 		sendMessageToClone(CloneMessage.ADD,ip);
 	}
@@ -585,7 +561,9 @@ public class Clone_Subject implements Observable {
 	@Override
 	public void unregisterObserver(String ip) {
 		int index = observers.indexOf(ip);
-		observers.remove(index);
+		synchronized (observers) {
+			observers.remove(index);
+		}
 	}
 	
 	/**
@@ -595,7 +573,7 @@ public class Clone_Subject implements Observable {
 	 */
 	@Override
 	public void notifyObservers(int type) {
-		if(observers.size() != 0){
+		synchronized (observers) {
 			for (String ip : observers) {
 				try {
 					Socket s = new Socket(ip, port);
@@ -618,7 +596,9 @@ public class Clone_Subject implements Observable {
 					s.close();
 					
 				} catch (IOException e) {
+					System.out.println(observers.size());
 					observers.remove(ip);
+					System.out.println(observers.size());
 				}
 			}
 		}
