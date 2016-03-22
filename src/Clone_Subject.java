@@ -203,7 +203,7 @@ public class Clone_Subject implements Observable {
 			}
 			synchronized (points) {
 				for(Integer point : toRemove)
-					points.remove(point);
+					points.remove(point.intValue());
 				numPoints = points.size();
 			}
 			break;

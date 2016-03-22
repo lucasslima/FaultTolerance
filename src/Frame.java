@@ -23,7 +23,8 @@ public class Frame extends JFrame{
 	}
 	
 	public void setPoints(List<Point> points) {
-		this.points = points;
+		this.points.clear();
+		this.points.addAll(points);
 	}
 	
 	 @Override
