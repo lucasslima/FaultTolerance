@@ -581,6 +581,7 @@ public class Clone_Subject implements Observable {
 	 */
 	@Override
 	public void notifyObservers(int type) {
+		List<String> toRemove = new ArrayList<>();
 		synchronized (observers) {
 			for (Iterator<String> it = observers.iterator(); it.hasNext();) {
 				String ip = it.next();
@@ -605,10 +606,11 @@ public class Clone_Subject implements Observable {
 					s.close();
 					
 				} catch (Exception e) {
-					observers.remove(ip);
+					toRemove.add(ip);
 					System.out.println("Conexão perdida com observer: " + ip);
 				}
 			}
+			observers.removeAll(toRemove);
 		}
 		newPoints.clear();
 	}
