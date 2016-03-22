@@ -11,6 +11,7 @@ import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 
@@ -25,7 +26,7 @@ public class ConcretObserver {
 	
 	public ConcretObserver() throws IOException{
 		serverSocket 		= new ServerSocket(port);
-		points 				= new ArrayList<Point>();
+		points 				= Collections.synchronizedList(new ArrayList<Point>());
 		masterIp			= null;
 		checkMasterSocket 	= new ServerSocket(checkMasterPort);
 		
@@ -115,7 +116,11 @@ public class ConcretObserver {
 							int type = message.getType();
 							
 							List<Point> newPoints = message.getPoints();
-							update(type,newPoints);
+							if (type == 0){
+								update(newPoints);
+							}else{
+								remove(message.getRemoveList());
+							}
 							
 							socket.close();
 						} catch (IOException | ClassNotFoundException e) {
@@ -130,14 +135,20 @@ public class ConcretObserver {
 	 * USADA SOMENTE PELO OBSERVER
 	 * Essa função atualiza o frame com o novo conjunto de pontos
 	 */
-	public static void update(int type,List<Point> newPoints) {
+	public static void update(List<Point> newPoints) {
+		synchronized (points) {
+			points.addAll(newPoints);
+			}
 		
-		switch(type){
-			case 0: points.addAll(newPoints);
-					break;
-			case 1: for(Point point : newPoints)
-						points.remove(point.getIndex());
-					break;
+		frame.setPoints(points);
+		frame.revalidate();
+		frame.repaint();
+	}
+	public static void remove(List<Integer> toRemove) {
+		for(Integer point : toRemove){
+			synchronized (point) {
+				points.remove(point);
+				}
 		}
 		
 		frame.setPoints(points);

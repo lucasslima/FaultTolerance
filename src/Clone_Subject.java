@@ -21,6 +21,7 @@ import java.util.Random;
 public class Clone_Subject implements Observable {
 	private static List<Point> 			points;
 	private static List<Point> 			newPoints;
+	private static List<Integer> 		toRemove;
 	private static List<String> 		observers;
 	private static int 					numPoints = 300;
 	private static final int 			minimum = 50;
@@ -48,6 +49,7 @@ public class Clone_Subject implements Observable {
 		observers 			= Collections.synchronizedList(new ArrayList<String>());
 		points 				= Collections.synchronizedList(new ArrayList<Point>());
 		newPoints 			= new ArrayList<Point>();
+		toRemove			= new ArrayList<Integer>();
 		random 				= new Random();
 		masterIp			= null;
 		cloneIp				= null;
@@ -196,10 +198,10 @@ public class Clone_Subject implements Observable {
 			for (int i = 0; i < getNumPointToRemove(); i++) {
 				int aux;
 				aux = random.nextInt(numPoints);
-				newPoints.add(currentPoints[aux]);
+				toRemove.add(aux);
 			}
 			synchronized (points) {
-				for(Point point : newPoints)
+				for(Integer point : toRemove)
 					points.remove(point);
 				numPoints = points.size();
 			}
@@ -581,7 +583,7 @@ public class Clone_Subject implements Observable {
 	 */
 	@Override
 	public void notifyObservers(int type) {
-		List<String> toRemove = new ArrayList<>();
+		List<String> ipsToRemove = new ArrayList<>();
 		synchronized (observers) {
 			for (Iterator<String> it = observers.iterator(); it.hasNext();) {
 				String ip = it.next();
@@ -594,6 +596,9 @@ public class Clone_Subject implements Observable {
 					switch(type){
 						case UPDATE:	message.setPoints(newPoints);
 										message.setType(change);
+										if (change == 1){
+											message.setRemoveList(toRemove);
+										}
 										break;
 						case NEWMASTER: message.setIp(serverSocket.getInetAddress().getHostAddress());
 										message.setType(NEWMASTER);
@@ -606,11 +611,11 @@ public class Clone_Subject implements Observable {
 					s.close();
 					
 				} catch (Exception e) {
-					toRemove.add(ip);
+					ipsToRemove.add(ip);
 					System.out.println("Conexão perdida com observer: " + ip);
 				}
 			}
-			observers.removeAll(toRemove);
+			observers.removeAll(ipsToRemove);
 		}
 		newPoints.clear();
 	}

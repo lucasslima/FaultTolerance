@@ -4,6 +4,7 @@ import java.util.List;
 public class SubjectMessage implements Serializable{
 	private static final long serialVersionUID = 1L;
 	private List<Point> points;
+	private List<Integer> toRemove;
 	private int 		type;
 	private String 		ip;
 
@@ -29,5 +30,13 @@ public class SubjectMessage implements Serializable{
 
 	public List<Point> getPoints() {
 		return points;
+	}
+
+	public List<Integer> getRemoveList() {
+		return toRemove;
+	}
+
+	public void setRemoveList(List<Integer> toRemove) {
+		this.toRemove = toRemove;
 	}
 }
