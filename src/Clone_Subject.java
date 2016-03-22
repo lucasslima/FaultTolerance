@@ -174,6 +174,7 @@ public class Clone_Subject implements Observable {
 	protected static void changePoints() {
 		change = random.nextInt(2);
 		newPoints.clear();
+		toRemove.clear();
 		switch (change) {
 		case 0:
 			for (int i = 0; i < getNumPointToChange(); i++) {
