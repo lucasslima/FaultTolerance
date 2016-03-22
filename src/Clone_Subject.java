@@ -14,17 +14,17 @@ import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
-import java.util.Stack;
 
 public class Clone_Subject implements Observable {
 	private static List<Point> 			points;
 	private static List<Point> 			newPoints;
 	private static List<String> 		observers;
-	private static int 					numPoints = 500;
-	private static final int 			minimum = 150;
-	private static final int 			maximum = 350;
+	private static int 					numPoints = 300;
+	private static final int 			minimum = 50;
+	private static final int 			maximum = 100;
 	private static final int 			SUBJECT = 0;
 	private static final int 			CLONE = 2;
 	private static ServerSocket 		serverSocket;
@@ -114,7 +114,7 @@ public class Clone_Subject implements Observable {
 			@Override
 			public void run(){
 				while((System.currentTimeMillis() - timeLastMessageMaster) < 950);
-				System.out.println("I am the master now");
+				System.out.println("Eu sou o master agora!");
 				try {
 					startNewMaster();
 				} catch (InterruptedException e) {
@@ -278,7 +278,6 @@ public class Clone_Subject implements Observable {
 							DatagramPacket receivepacket = new DatagramPacket(recvBuf,
 						                                                 recvBuf.length);
 							dsocket.receive(receivepacket);
-							System.out.println("Package recieved");
 							int byteCount = receivepacket.getLength();
 							ByteArrayInputStream receivebyteStream = new ByteArrayInputStream(recvBuf);
 						      ObjectInputStream is = new
@@ -331,10 +330,6 @@ public class Clone_Subject implements Observable {
 			}
 		};
 		threadMaster.start();
-		if(observers.size() != 0)
-			myInstance.notifyObservers(NEWMASTER);
-		
-		
 	}
 	
 	/**
@@ -405,6 +400,7 @@ public class Clone_Subject implements Observable {
 		switch(message.getType()){
 			case CloneMessage.REGISTER: if(cloneIp == null){
 											cloneIp = message.getCloneIp();
+											System.out.println(cloneIp + " é o clone agora!");
 											sendMessageToClone(CloneMessage.NEW,cloneIp);
 										}
 										break;
@@ -488,7 +484,7 @@ public class Clone_Subject implements Observable {
 			
 			s.close();	
 		} catch (IOException e) {
-			System.out.println("No connection");
+			System.out.println("Sem conexão com o clone!");
 			if(observers.size() != 0)
 				myInstance.notifyObservers(UPDATE);
 		}
@@ -548,6 +544,7 @@ public class Clone_Subject implements Observable {
 	public void registerObserver(String ip) throws UnknownHostException, IOException {
 		synchronized (observers) {
 			observers.add(ip);
+			System.out.println("Adicionado o observer: " + ip);
 		}
 		notifyObserverJustRegistered(ip);
 		sendMessageToClone(CloneMessage.ADD,ip);
@@ -562,6 +559,7 @@ public class Clone_Subject implements Observable {
 	public void unregisterObserver(String ip) {
 		int index = observers.indexOf(ip);
 		synchronized (observers) {
+			System.out.println("Removido o observer: " + ip);
 			observers.remove(index);
 		}
 	}
@@ -574,7 +572,8 @@ public class Clone_Subject implements Observable {
 	@Override
 	public void notifyObservers(int type) {
 		synchronized (observers) {
-			for (String ip : observers) {
+			for (Iterator<String> it = observers.iterator(); it.hasNext();) {
+				String ip = it.next();
 				try {
 					Socket s = new Socket(ip, port);
 					ObjectOutputStream out = new ObjectOutputStream(s.getOutputStream());
@@ -596,9 +595,8 @@ public class Clone_Subject implements Observable {
 					s.close();
 					
 				} catch (IOException e) {
-					System.out.println(observers.size());
 					observers.remove(ip);
-					System.out.println(observers.size());
+					System.out.println("Conexão perdida com observer: " + ip);
 				}
 			}
 		}
@@ -647,7 +645,9 @@ public class Clone_Subject implements Observable {
 	 * @return a quantidade de pontos a serem removidos
 	 */
 	public static int getNumPointToRemove() {
-		int randomNum = random.nextInt(numPoints);
+		int n = maximum - minimum + 1;
+		int i = random.nextInt() % n;
+		int randomNum = minimum + i;
 		return Math.abs(randomNum);
 	}
 	
