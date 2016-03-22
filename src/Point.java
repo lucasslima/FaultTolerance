@@ -44,6 +44,12 @@ public class Point implements Serializable, Comparable<Point>{
 	}
 	
 	@Override
+	public boolean equals(Object obj) {
+        Point p = (Point)obj;
+        return x == p.x && y == p.y;
+    }    
+
+	@Override
 	public int compareTo(Point o) {
 
 		Point p = o;

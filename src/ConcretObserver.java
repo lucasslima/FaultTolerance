@@ -116,11 +116,7 @@ public class ConcretObserver {
 							int type = message.getType();
 							
 							List<Point> newPoints = message.getPoints();
-							if (type == 0){
-								update(newPoints);
-							}else{
-								remove(message.getRemoveList());
-							}
+							update(type,newPoints);
 							
 							socket.close();
 						} catch (IOException | ClassNotFoundException e) {
@@ -135,20 +131,19 @@ public class ConcretObserver {
 	 * USADA SOMENTE PELO OBSERVER
 	 * Essa função atualiza o frame com o novo conjunto de pontos
 	 */
-	public static void update(List<Point> newPoints) {
-		synchronized (points) {
-			points.addAll(newPoints);
-			}
+	public static void update(int type,List<Point> newPoints) {
 		
-		frame.setPoints(points);
-		frame.revalidate();
-		frame.repaint();
-	}
-	public static void remove(List<Integer> toRemove) {
-		for(Integer point : toRemove){
-			synchronized (point) {
-				points.remove(point);
+		switch(type){
+			case 0: 
+				synchronized (points) {
+					points.addAll(newPoints);
 				}
+				
+					break;
+			case 1: for(Point point : newPoints)
+				synchronized (point) {
+					points.remove(point);
+				}break;
 		}
 		
 		frame.setPoints(points);

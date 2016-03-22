@@ -199,11 +199,12 @@ public class Clone_Subject implements Observable {
 			for (int i = 0; i < getNumPointToRemove(); i++) {
 				int aux;
 				aux = random.nextInt(numPoints);
+				newPoints.add(currentPoints[aux]);
 				toRemove.add(aux);
 			}
 			synchronized (points) {
-				for(Integer point : toRemove)
-					points.remove(point.intValue());
+				for(Point point : newPoints)
+					points.remove(point);
 				numPoints = points.size();
 			}
 			break;
