@@ -46,7 +46,7 @@ public class Clone_Subject implements Observable {
 	
 	public Clone_Subject() throws IOException{
 		observers 			= Collections.synchronizedList(new ArrayList<String>());
-		points 				= new ArrayList<Point>();
+		points 				= Collections.synchronizedList(new ArrayList<Point>());
 		newPoints 			= new ArrayList<Point>();
 		random 				= new Random();
 		masterIp			= null;
@@ -171,6 +171,7 @@ public class Clone_Subject implements Observable {
 	 */
 	protected static void changePoints() {
 		change = random.nextInt(2);
+		newPoints.clear();
 		switch (change) {
 		case 0:
 			for (int i = 0; i < getNumPointToChange(); i++) {
@@ -184,8 +185,10 @@ public class Clone_Subject implements Observable {
 				newPoints.add(point);
 
 			}
-			points.addAll(newPoints);
-			numPoints = points.size();
+			synchronized (points) {
+				points.addAll(newPoints);
+				numPoints = points.size();
+			}
 			break;
 
 		case 1:
@@ -195,8 +198,11 @@ public class Clone_Subject implements Observable {
 				aux = random.nextInt(numPoints);
 				newPoints.add(currentPoints[aux]);
 			}
-			points.removeAll(newPoints);
-			numPoints = points.size();
+			synchronized (points) {
+				for(Point point : newPoints)
+					points.remove(point);
+				numPoints = points.size();
+			}
 			break;
 		}
 	}
@@ -347,7 +353,11 @@ public class Clone_Subject implements Observable {
 		timeLastMessageMaster = System.currentTimeMillis();
 		
 		switch(message.getType()){	
-			case CloneMessage.NEW:		points.addAll(message.getPoints());
+			case CloneMessage.NEW:		
+				synchronized (points) {
+					points.addAll(message.getPoints());
+				}
+				
 										synchronized (observers) {
 											observers.addAll(message.getObservers() ) ;
 										}
@@ -594,7 +604,7 @@ public class Clone_Subject implements Observable {
 					out.close();
 					s.close();
 					
-				} catch (IOException e) {
+				} catch (Exception e) {
 					observers.remove(ip);
 					System.out.println("Conexão perdida com observer: " + ip);
 				}
@@ -645,10 +655,7 @@ public class Clone_Subject implements Observable {
 	 * @return a quantidade de pontos a serem removidos
 	 */
 	public static int getNumPointToRemove() {
-		int n = maximum - minimum + 1;
-		int i = random.nextInt() % n;
-		int randomNum = minimum + i;
-		return Math.abs(randomNum);
+		return (int) Math.abs(numPoints * 0.15);
 	}
 	
 }
